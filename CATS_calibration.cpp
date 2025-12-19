@@ -16,8 +16,8 @@
 #include <iostream>
 
 std::string input_file = "/media/olivia/Partition1/CATS/r0193_000a.root";
-//std::string output_file_name = "coeficienti_calibrare_Cats1_Y.txt";
-//std::ofstream output_lin_reg("coeficienti_regresie_Cats1Y.txt"); Nu merge declaratia in afara main
+std::string output_file_name = "coeficienti_calibrare_Cats2_Y.txt";
+//std::ofstream output_lin_reg("coeficienti_regresie_Cats2Y.txt"); Nu merge declaratia in afara main
 
 
 constexpr int number_of_wires = 28;
@@ -79,50 +79,42 @@ void Linear_Regression(double *pulser_values, double *PeakPositions, int stripIn
     double slope     = line->GetParameter(1);
     output_lin_reg<<stripIndex<<" "<<slope<<" "<<intercept<<" "<<PeakPositions[0]<<'\n';
 
-    // delete graph;
-    // delete line;
-
 }
-
-//TODO for cats2 as well
 
 void CATS_calibration()
 {
-
     //I/O 
     TFile *inputRootFile = TFile::Open(input_file.c_str(), "READ");
     if (!inputRootFile || inputRootFile->IsZombie()) { printf("Cannot open file\n"); return; }
-    std::ofstream output_lin_reg("coeficienti_regresie_Cats1Y.txt");
+    std::ofstream output_lin_reg("coeficienti_regresie_Cats2Y.txt");
 
     TTree *catsTree = (TTree*)inputRootFile->Get("AD");
     if (!catsTree) { printf("Cannot find tree AD\n"); return; }
 
     //std::ofstream output_file(output_file_name);
 
-    const int histogramBins = 2000;
+    const int histogramBins = 4000;
     const double histogramMin = 0.0;
-    const double histogramMax = 12000.0; // y este doar pana la 6000 
+    const double histogramMax = 20000.0; // y este doar pana la 6000 
 
     const int maxPeaks = 6;
     const double searchSigma = 2.0;
     const double searchThreshold = 0.3; //peakurile noastre au dimensiuni similare
     const double fitHalfWindow = 100.0;
 
-
-    for (int stripIndex = 0; stripIndex < number_of_wires; ++stripIndex)
+    for (int stripIndex = 1; stripIndex < number_of_wires; ++stripIndex) // zero este defect
     {
-
         //Generam canvasurile si histogramele
-        TCanvas *stripCanvas = new TCanvas(Form("c_CATS1Y_strip_%d", stripIndex), Form("CATS1Y strip %d", stripIndex), 900, 650);
+        TCanvas *stripCanvas = new TCanvas(Form("c_CATS2Y_strip_%d", stripIndex), Form("CATS2Y strip %d", stripIndex), 900, 650);
         stripCanvases.push_back(stripCanvas);
 
         catsTree->Draw(
-            Form("CATS1YV>>h_CATS1Y_strip_%d(%d,%f,%f)", stripIndex, histogramBins, histogramMin, histogramMax),
-            Form("CATS1YVN==%d", stripIndex),
+            Form("CATS2YV>>h_CATS2Y_strip_%d(%d,%f,%f)", stripIndex, histogramBins, histogramMin, histogramMax),
+            Form("CATS2YVN==%d", stripIndex),
             "goff"
         );
 
-        TH1F *stripHistogram = (TH1F*)gDirectory->Get(Form("h_CATS1Y_strip_%d", stripIndex));
+        TH1F *stripHistogram = (TH1F*)gDirectory->Get(Form("h_CATS2Y_strip_%d", stripIndex));
         if (!stripHistogram) continue;
         stripHistograms.push_back(stripHistogram); //salvam histograma pentru export
 
@@ -139,17 +131,15 @@ void CATS_calibration()
         Linear_Regression(pulser_values,PeakPositions,stripIndex,output_lin_reg);
        // Verify_Calibration();
 
-    // output_file << stripIndex << " ";
-    // for (int i = 0; i < 6; i++)
-    // {
-    //     std::cout << PeakPositions[i] << " ";
-    //     output_file << PeakPositions[i] << " ";
-    // }
-    // output_file << "\n";
+        // output_file << stripIndex << " ";
+        // for (int i = 0; i < 6; i++){
+
+        //     std::cout << PeakPositions[i] << " ";
+        //     output_file << PeakPositions[i] << " ";
+        // }
+        // output_file << "\n";
        
-    //  }
+     }
         
    
-}
-
 }

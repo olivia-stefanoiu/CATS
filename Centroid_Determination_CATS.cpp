@@ -56,8 +56,8 @@ double calculate_centroid(double strip_energies[28]){
 
 void Centroid_Determination_CATS(){
 
-ifstream fisier_coeficienti_CATS1X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats1X.txt");
-ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats1Y.txt");
+ifstream fisier_coeficienti_CATS1X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats2X.txt");
+ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats2Y.txt");
 TFile *inputRootFile = TFile::Open("/media/olivia/Partition1/CATS/r0421_000a.root", "READ");
 
 double slope_CATS1X[28];
