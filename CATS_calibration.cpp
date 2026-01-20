@@ -77,7 +77,7 @@ void Linear_Regression(double *pulser_values, double *PeakPositions, int stripIn
 
     double intercept = line->GetParameter(0);
     double slope     = line->GetParameter(1);
-    output_lin_reg<<stripIndex<<" "<<slope<<" "<<intercept<<" "<<PeakPositions[0]<<'\n';
+    //output_lin_reg<<stripIndex<<" "<<slope<<" "<<intercept<<" "<<PeakPositions[0]<<'\n';
 
 }
 
@@ -102,7 +102,7 @@ void CATS_calibration()
     const double searchThreshold = 0.3; //peakurile noastre au dimensiuni similare
     const double fitHalfWindow = 100.0;
 
-    for (int stripIndex = 1; stripIndex < number_of_wires; ++stripIndex) // zero este defect
+    for (int stripIndex = 1; stripIndex < 27; ++stripIndex) // zero este defect
     {
         //Generam canvasurile si histogramele
         TCanvas *stripCanvas = new TCanvas(Form("c_CATS2Y_strip_%d", stripIndex), Form("CATS2Y strip %d", stripIndex), 900, 650);
@@ -128,7 +128,7 @@ void CATS_calibration()
 
       
         Gaussian_Fit(PeakPositions,stripHistogram,stripIndex);
-        Linear_Regression(pulser_values,PeakPositions,stripIndex,output_lin_reg);
+       // Linear_Regression(pulser_values,PeakPositions,stripIndex,output_lin_reg);
        // Verify_Calibration();
 
         // output_file << stripIndex << " ";

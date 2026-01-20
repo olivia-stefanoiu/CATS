@@ -1,0 +1,82 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+import ROOT
+from sklearn.linear_model import LinearRegression
+from collections import Counter
+from numpy import arctan, degrees, radians, cos, sin
+from sklearn.linear_model import RANSACRegressor
+from array import array
+from numpy import arctan, degrees
+from ROOT import TGraph, TLine, kRed, kAzure
+
+
+def RANSAC_fit_line(x,y, threshold, show):
+
+
+    model = RANSACRegressor(residual_threshold=threshold)
+    model.fit(x.reshape(-1, 1), y)
+
+    inliers = model.inlier_mask_
+    slope = model.estimator_.coef_[0]
+    intercept = model.estimator_.intercept_
+
+    if show:
+        x_min, x_max = float(x.min()), float(x.max())
+        y_min, y_max = float(y.min()), float(y.max())
+        hist = ROOT.TH2F("hist", "", 1000, x_min, x_max, 1000, y_min, y_max)
+
+        for i in range(len(x)):
+            hist.Fill(float(x[i]), float(y[i]))
+
+        canvas = ROOT.TCanvas("c", "RANSAC Inliers", 800, 600)
+        hist.Draw("COLZ")
+
+        x_inliers = array('d', x[inliers])
+        y_inliers = array('d', y[inliers])
+        graph = TGraph(len(x_inliers), x_inliers, y_inliers)
+        graph.SetMarkerColor(kRed)
+        graph.SetMarkerStyle(20)
+        graph.SetMarkerSize(0.3)
+        graph.Draw("P SAME")
+
+        # Draw the fitted line
+        y_min = slope * x_min + intercept
+        y_max = slope * x_max + intercept
+        line = TLine(x_min, y_min, x_max, y_max)
+        line.SetLineColor(kAzure + 7)  # Turquoise-ish color
+        line.SetLineWidth(2)
+        line.Draw("SAME")
+
+        canvas.Update()
+        input("Press Enter to continue...")
+
+    return inliers, slope, intercept
+
+
+f = ROOT.TFile.Open("/home/olivia/Desktop/scripts/CATS/CATS2_Centroid.root")
+h = f.Get("hCATS2XY")
+
+x_vals = []
+y_vals = []
+
+nx = h.GetNbinsX()
+ny = h.GetNbinsY()
+
+for ix in range(1, nx+1):
+    for iy in range(1, ny+1):
+        content = h.GetBinContent(ix, iy)
+        if content > 0:
+            x = h.GetXaxis().GetBinCenter(ix)
+            y = h.GetYaxis().GetBinCenter(iy)
+            for _ in range(int(content)):
+                x_vals.append(x)
+                y_vals.append(y)
+
+
+selected_x = [x for x, y in zip(x_vals, y_vals) if -2 <= y <= 1]
+selected_y = [y for x, y in zip(x_vals, y_vals) if -2 <= y <= 1]
+
+inliers,slope,intercept =RANSAC_fit_line(selected_x,selected_y,0.0001,True)
+
+
