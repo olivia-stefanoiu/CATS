@@ -101,9 +101,9 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         int stripIndex = (int)stripNumberArray[hit_index];
 
         if(stripIndex == 0 || stripIndex > 27) continue;
-        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex] + 100.0) continue;
+        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]/2 + 100.0) continue;
 
-        double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex] - 100.0) * slopeArray[stripIndex] + interceptArray[stripIndex];
+        double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]/2 - 100.0) * slopeArray[stripIndex] + interceptArray[stripIndex];
         energyByStripArray[stripIndex] += calibratedEnergy;
     }
 }
@@ -365,12 +365,8 @@ double deltaZ_targetFromCATS2 = 743;
 
 //TTree *catsTree = (TTree*)inputRootFile->Get("AD");
 TChain* catsTree = new TChain("AD");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_000a.root");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_001a.root");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_002a.root");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_003a.root");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_004a.root");
-catsTree->Add("/media/olivia/Partition1/CATS/r1163_005a.root");
+catsTree->Add("/media/olivia/Partition1/CATS/r0948_00*a.root");
+
 
 catsTree->SetBranchAddress("CATS1XVM", &CATS1XVM);
 catsTree->SetBranchAddress("CATS1XV",  &CATS1XV);
@@ -391,16 +387,34 @@ catsTree->SetBranchAddress("CATS2YVN", &CATS2YVN);
 catsTree->SetBranchAddress("Id_6", &Id_6);
 catsTree->SetBranchAddress("Id_11", &Id_11);
 
+TCanvas* cId = new TCanvas("cId","Id_6 vs Id_11",900,800);
+catsTree->Draw("Id_11:Id_6","CATS1XVM==10","COLZ");
+cId->Update();
+std::cout << "Press Enter..." << std::flush;
+std::cin.get();
+
+TCanvas* cSame = new TCanvas("cSame","CATS1XVN and CATS2XVN",900,800);
+catsTree->Draw("CATS1XVN","Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5 && CATS1XV>1000");
+catsTree->Draw("CATS2XVN","Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5 && CATS2XV>1000","SAME");
+cSame->Update();
+std::cout << "Press Enter..." << std::flush;
+std::cin.get();
+
+
 Long64_t entries = catsTree->GetEntries();
-TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -200,200, 1000, -200, 200);
+TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40,50, 1000, -40, 40);
 
 for (Long64_t entry = 0; entry < entries; ++entry) {
 
     catsTree->GetEntry(entry);
 
-   if(!(Id_6>6.4 && Id_6<6.7 && Id_11>225.3 && Id_11<225.9))continue; //verificam ca am selectat doar anumiti nuclei 
-   // if(!(Id_6>4 && Id_6<22 && Id_11>220 && Id_11<235))continue;
+   //if(!(Id_6>6.4 && Id_6<6.7 && Id_11>225.3 && Id_11<225.9))continue; //verificam ca am selectat doar anumiti nuclei 
+   //if(!(Id_6>4 && Id_6<22 && Id_11>220 && Id_11<235))continue;
     //if ( DATATRIG_CATS2TS-DATATRIG_CATS1TS>2000) continue; not needed all events are in the interval
+
+    //948
+    if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
+
 
     FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip);
     FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip);
@@ -424,6 +438,9 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
     rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
                           x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
                           corrected_CATS2X, corrected_CATS2Y);
+    
+   if(centroid_CATS1X>5 && centroid_CATS1X<6 )
+    hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
 
     centroid_CATS1X = corrected_CATS1X;
     centroid_CATS1Y = corrected_CATS1Y;
@@ -433,10 +450,10 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
     X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
     Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
 
-    hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
+   // hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
   // hTargetXY->Fill(X_f, Y_f);
   // std::cout<<X_f<<endl;
-   // hTargetXY->Fill(centroid_CATS1X,centroid_CATS1Y);
+    
 
 }
 
