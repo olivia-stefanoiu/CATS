@@ -14,11 +14,12 @@
 #include <cstdio>
 #include <array>
 #include <iostream>
+#include <math.h>
 
 
 void citire_calibrare(std::ifstream &file, double slope[28], double intercept[28],double pedestal[28])
 {
-
+    //Calibram per strip pana ajung toate la acelasi nivel. Pedestalul este foarte important pentru eliminarea zgomotolui
     int strip;
     for (int i = 0; i < 28; ++i){
         file >>strip>> slope[i] >> intercept[i]>>pedestal[i];
@@ -27,6 +28,7 @@ void citire_calibrare(std::ifstream &file, double slope[28], double intercept[28
     cout<<'\n';
 }
 
+//Normalizam la un strip la alegere valorile celorlalte
 void NormalizeToFirstStrip(double* slopeArray, double* interceptArray, int arrayLength = 28, int referenceIndex = 1)
 {
     double referenceSlope = slopeArray[referenceIndex];
@@ -39,53 +41,7 @@ void NormalizeToFirstStrip(double* slopeArray, double* interceptArray, int array
     }
 }
 
-// double calculate_centroid(double strip_energies[28])
-// {
-//     double best_cluster_energy_sum = 0.0;
-//     double best_cluster_weighted_sum = 0.0;
-
-//     double cluster_energy_sum = 0.0;
-//     double cluster_weighted_sum = 0.0;
-//     int cluster_strip_count = 0;
-
-//     for(int strip_index = 0; strip_index < 28; strip_index++)
-//     {
-//         if(strip_energies[strip_index] == 0.0)
-//         {
-//             if(cluster_strip_count > 1)
-//             {
-//                 if(cluster_energy_sum > best_cluster_energy_sum)
-//                 {
-//                     best_cluster_energy_sum = cluster_energy_sum;
-//                     best_cluster_weighted_sum = cluster_weighted_sum;
-//                 }
-//             }
-//             cluster_energy_sum = 0.0;
-//             cluster_weighted_sum = 0.0;
-//             cluster_strip_count = 0;
-//             continue;
-//         }
-
-//         cluster_weighted_sum += (double)strip_index * strip_energies[strip_index];
-//         cluster_energy_sum += strip_energies[strip_index];
-//         cluster_strip_count++;
-//     }
-
-//     if(cluster_strip_count > 1)
-//     {
-//         if(cluster_energy_sum > best_cluster_energy_sum)
-//         {
-//             best_cluster_energy_sum = cluster_energy_sum;
-//             best_cluster_weighted_sum = cluster_weighted_sum;
-//         }
-//     }
-
-//     if(best_cluster_energy_sum <= 0.0) return -1000.0;
-
-//     double centroid_max = best_cluster_weighted_sum / best_cluster_energy_sum;
-//     return ((centroid_max - 13.5) * 2.54);
-// }
-
+//selectam doar stripurile care au valori peste pedestal si calibram 
 void FillEnergiesByStrip(const UShort_t* stripNumberArray,
                          const Float_t* rawValueArray,
                          int multiplicity,
@@ -101,15 +57,14 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         int stripIndex = (int)stripNumberArray[hit_index];
 
         if(stripIndex == 0 || stripIndex > 27) continue;
-        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]/2 + 100.0) continue;
-
-        double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]/2 - 100.0) * slopeArray[stripIndex] + interceptArray[stripIndex];
-        energyByStripArray[stripIndex] += calibratedEnergy;
+        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]+200) continue;
+        //TODO Formula completa contine si inercept dar noi l-am luat zero (raw-ped)^2
+        // double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
+       // energyByStripArray[stripIndex] += calibratedEnergy;
     }
 }
-// 
-
-std::vector<int> build_fstrip(const double strip_energies[28]){
+// for the reconstruction algorithms we need to get the ordered values of the strip energies and select only the nstrip highest ones
+std::vector<int> build_ordered_strip_energies(const double strip_energies[28]){
     std::vector<int> fired;
     fired.reserve(28);
     for(int strip_index = 0; strip_index < 28; strip_index++){
@@ -120,49 +75,6 @@ std::vector<int> build_fstrip(const double strip_energies[28]){
                   return strip_energies[left_index] > strip_energies[right_index];
               });
     return fired;
-}
-
-bool check_neighbours(std::vector<int>& fstrip, const double strip_energies[28]){
-    if((int)fstrip.size() < 3) return false;
-
-    int center_strip = fstrip[0];
-
-    auto is_neighbour = [&](int strip_index){
-        return (std::abs(strip_index - center_strip) == 1) && (strip_energies[strip_index] > 0.0);
-    };
-
-    if(!is_neighbour(fstrip[1])) return false;
-    if(is_neighbour(fstrip[2])) return true;
-
-    if((int)fstrip.size() > 3 && is_neighbour(fstrip[3])){
-        int tmp = fstrip[2]; fstrip[2] = fstrip[3]; fstrip[3] = tmp;
-        return true;
-    }
-
-    if((int)fstrip.size() > 4 && is_neighbour(fstrip[4])){
-        int tmp = fstrip[2]; fstrip[2] = fstrip[4]; fstrip[4] = tmp;
-        return true;
-    }
-
-    return false;
-}
-
-double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip, int nstrips){
-    if(nstrips <= 0) return -1000.0;
-    if((int)fstrip.size() < nstrips) return -1000.0;
-
-    double numerator = 0.0;
-    double denominator = 0.0;
-
-    for(int rank_index = 0; rank_index < nstrips; rank_index++){
-        int strip_index = fstrip[rank_index];
-        double energy = strip_energies[strip_index];
-        numerator += (double)strip_index * energy;
-        denominator += energy;
-    }
-
-    if(denominator <= 0.0) return -1000.0;
-    return numerator / denominator;
 }
 
 double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
@@ -187,7 +99,7 @@ double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
     if(v3 == 0.0) return -1000.0;
 
     double v4 = (v0 - v1) / (2.0 * std::sinh(v3));
-    if(std::abs(v4) >= 1.0) return -1000.0;
+    if(std::fabs(v4) >= 1.0) return -1000.0;
 
     double v5 = 0.5 * std::log((1.0 + v4) / (1.0 - v4));
 
@@ -197,73 +109,79 @@ double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
     return xs;
 }
 
-double fit_gauss_array(const double strip_energies[28]){
-    static TH1D* h1 = new TH1D("hQCats_tmp","hQCats_tmp",29,-0.5,28.5);
-    static TF1* f1 = new TF1("f1_tmp","gaus(0)",0,28);
 
-    h1->Reset();
+//Weighted avg has the best results for nstrip = 3 respectively 5. Adding more strips does not increase performance 
+double weighted_average(const double strip_energies[28], const std::vector<int>& ordered_strip_energies, int nstrips=3){
+    //verific deja in fct calculate_centroid
+    if((int)ordered_strip_energies.size()<=1) return -1000.0;
+    if((int)ordered_strip_energies.size() < nstrips) nstrips = (int)ordered_strip_energies.size();
 
-    int nmax = -1;
-    double qmax = 0.0;
+    double numerator = 0.0;
+    double denominator = 0.0;
 
-    for(int strip_index = 0; strip_index < 28; strip_index++){
-        double q = strip_energies[strip_index];
-        if(q <= 0.0) continue;
+    // std::vector<int> copied_strip_indices = ordered_strip_energies;
+    // std::vector<int> adjacent_indices;
+    // int max_index = ordered_strip_energies[0]
+    // int index = max_index;
+    // std::sort(copied_strip_indices.begin(), copied_strip_indices.end());
 
-        h1->Fill((double)strip_index, q);
+    // auto pointer_position= std::find(copied_strip_indices.begin(), copied_strip_indices.end(), max_index);
+    // int position = (iterator == copied_strip_indices.end()) ? -1 : (int)std::distance(copied_strip_indices.begin(), pointer_position);
+    // int aux_position = position;
+    // //TODO este ok sa presupun ca celelalte stripuri care au tras sunt fix langa?
+    // while( aux_position>0 && position-copied_strip_indices[aux_position]==1){ adjacent_indices.push_back(aux_position)}
 
-        if(q > qmax){
-            qmax = q;
-            nmax = strip_index;
-        }
+    
+    for(int rank_index = 0; rank_index < nstrips; rank_index++){
+        int strip_index = ordered_strip_energies[rank_index];
+        double energy = strip_energies[strip_index];
+        numerator += (double)strip_index * energy;
+        denominator += energy;
     }
 
-    if(nmax < 0) return -1000.0;
+    if(denominator <= 0.0) return -1000.0;
+    return numerator / denominator;
+}
 
-    f1->SetParameter(0,1000);
-    f1->SetParameter(1,14);
-    f1->SetParameter(2,1.0);
+bool check_neighbours(std::vector<int>& fstrip, const double strip_energies[28]){
+    if((int)fstrip.size() < 3) return false;
 
-    f1->SetParLimits(1,0,28);
-    f1->SetParLimits(2,0,3);
+    int center_strip = fstrip[0];
 
-    double fit_min = (double)nmax - 4.0;
-    double fit_max = (double)nmax + 4.0;
-    if(fit_min < 0.0) fit_min = 0.0;
-    if(fit_max > 28.0) fit_max = 28.0;
+    auto is_neighbour = [&](int strip_index){
+        return (std::fabs(strip_index - center_strip) == 1) && (strip_energies[strip_index] > 0.0);
+    };
 
-    h1->Fit(f1,"QNLB","",fit_min,fit_max);
+    if(!is_neighbour(fstrip[1])) return false;
+    if(is_neighbour(fstrip[2])) return true;
 
-    double xtmp = f1->GetParameter(1);
-    if(xtmp > 0.0 && xtmp < 28.0) return xtmp;
-    return -1000.0;
+    if((int)fstrip.size() > 3 && is_neighbour(fstrip[3])){
+        int tmp = fstrip[2]; fstrip[2] = fstrip[3]; fstrip[3] = tmp;
+        return true;
+    }
+
+    if((int)fstrip.size() > 4 && is_neighbour(fstrip[4])){
+        int tmp = fstrip[2]; fstrip[2] = fstrip[4]; fstrip[4] = tmp;
+        return true;
+    }
+
+    return false;
 }
 
 double calculate_centroid(double strip_energies[28]){
-    std::vector<int> fstrip = build_fstrip(strip_energies);
-    int m = (int)fstrip.size();
-    if(m < 1) return -1000.0;
-
+    std::vector<int> ordered_strip_energies = build_ordered_strip_energies(strip_energies);
+    int multiplicity = (int)ordered_strip_energies.size();
+  
     double x = -1000.0;
-
-    if(m >= 3){
-        if(check_neighbours(fstrip, strip_energies)){
-            x = sechip(strip_energies, fstrip);
-        } else {
-            x = fit_gauss_array(strip_energies);
-        }
-    } else if(m == 2){
-        x = weighted_average(strip_energies, fstrip, 2);
-    } else {
-        if(strip_energies[fstrip[0]] > 500.0) x = (double)fstrip[0];
-        else x = -1000.0;
-    }
-
+   // x = weighted_average(strip_energies,ordered_strip_energies, 3);
+    if (!check_neighbours(ordered_strip_energies,strip_energies))return -1000;
+    x = sechip(strip_energies,ordered_strip_energies);
     if(x == -1000.0) return -1000.0;
+    //TODO verifica daca de aici e problema cu gridul 
     return ((x - 13.5) * 2.54);
 }
 
-
+//aligning the CATS
 void rotate_and_shift_centroid(double input_x, double input_y,
                                double x_shift, double slope_shift, double intercept_shift, double center_position,
                                double& output_x, double& output_y)
@@ -286,6 +204,8 @@ ifstream fisier_coeficienti_CATS1X("/home/olivia/Desktop/scripts/CATS/coeficient
 ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS1Y.txt");
 ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2X.txt");
 ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
+const char* file_address = "/media/olivia/Partition1/CATS/r0948_00*a.root";
+
 //TFile *inputRootFile = TFile::Open("/media/olivia/Partition1/CATS/r1163_000a.root", "READ");
 
 double slope_CATS1X[28];
@@ -316,6 +236,8 @@ double centroid_CATS1Y;
 double centroid_CATS2X;
 double centroid_CATS2Y;
 
+//TODO no more hardcoding, read from file
+//TODO recalculeaza ptr Cats1 coeficientii ca e stramb
 double slope_shift_CATS1 = 0.02250442496464144;
 double intercept_shift_CATS1 = 2.7132336197449174;
 double x_shift_CATS1 = 7.046736916766848;
@@ -365,7 +287,7 @@ double deltaZ_targetFromCATS2 = 743;
 
 //TTree *catsTree = (TTree*)inputRootFile->Get("AD");
 TChain* catsTree = new TChain("AD");
-catsTree->Add("/media/olivia/Partition1/CATS/r0948_00*a.root");
+catsTree->Add(file_address);
 
 
 catsTree->SetBranchAddress("CATS1XVM", &CATS1XVM);
@@ -387,22 +309,22 @@ catsTree->SetBranchAddress("CATS2YVN", &CATS2YVN);
 catsTree->SetBranchAddress("Id_6", &Id_6);
 catsTree->SetBranchAddress("Id_11", &Id_11);
 
-TCanvas* cId = new TCanvas("cId","Id_6 vs Id_11",900,800);
-catsTree->Draw("Id_11:Id_6","CATS1XVM==10","COLZ");
-cId->Update();
-std::cout << "Press Enter..." << std::flush;
-std::cin.get();
+// TCanvas* cId = new TCanvas("cId","Id_6 vs Id_11",900,800);
+// catsTree->Draw("Id_11:Id_6>>hId11Id6(1000,0,10,1000,225,235)","","COLZ");
+// cId->Update();
+// std::cout << "Press Enter..." << std::flush;
+// std::cin.get();
 
-TCanvas* cSame = new TCanvas("cSame","CATS1XVN and CATS2XVN",900,800);
-catsTree->Draw("CATS1XVN","Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5 && CATS1XV>1000");
-catsTree->Draw("CATS2XVN","Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5 && CATS2XV>1000","SAME");
-cSame->Update();
-std::cout << "Press Enter..." << std::flush;
-std::cin.get();
+// TCanvas* cSame = new TCanvas("cSame","CATS1XVN and CATS2XVN",900,800);
+// catsTree->Draw("CATS1XVN","Id_6 > 6.4 && Id_6 < 8 && Id_11>226.5 && Id_11<229.5 && CATS1XV>1000");
+// catsTree->Draw("CATS2XVN","Id_6 > 6.4 && Id_6 < 8 && Id_11>226.5 && Id_11<229.5 && CATS2XV>1000","SAME");
+// cSame->Update();
+// std::cout << "Press Enter..." << std::flush;
+// std::cin.get();
 
 
 Long64_t entries = catsTree->GetEntries();
-TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40,50, 1000, -40, 40);
+TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40,40, 1000, -40, 40);
 
 for (Long64_t entry = 0; entry < entries; ++entry) {
 
@@ -412,21 +334,23 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
    //if(!(Id_6>4 && Id_6<22 && Id_11>220 && Id_11<235))continue;
     //if ( DATATRIG_CATS2TS-DATATRIG_CATS1TS>2000) continue; not needed all events are in the interval
 
-    //948
-    if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
-
+    //948 SULF
+   if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
+   //Beamul se shifteaza la SI
+   //if(!(Id_6>0&& Id_6<10 && Id_11>220 && Id_11<230))continue;
 
     FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip);
     FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip);
-    FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
-    FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
+    // FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
+    // FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
 
     centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip);
     centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip);
-    centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip);
-    centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip);
+//    centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip);
+//    centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip);
 
-    if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
+    // if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
+     if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 ) continue;
 
     double corrected_CATS1X, corrected_CATS1Y;
     double corrected_CATS2X, corrected_CATS2Y;
@@ -435,31 +359,32 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
                           x_shift_CATS1, slope_shift_CATS1, intercept_shift_CATS1, center_position_CATS1,
                           corrected_CATS1X, corrected_CATS1Y);
 
-    rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
-                          x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
-                          corrected_CATS2X, corrected_CATS2Y);
+    // rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
+    //                       x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
+    //                       corrected_CATS2X, corrected_CATS2Y);
     
-   if(centroid_CATS1X>5 && centroid_CATS1X<6 )
-    hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
+//    if(centroid_CATS1X>5 && centroid_CATS1X<6 )
+//     hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
 
     centroid_CATS1X = corrected_CATS1X;
     centroid_CATS1Y = corrected_CATS1Y;
-    centroid_CATS2X = corrected_CATS2X;
-    centroid_CATS2Y = corrected_CATS2Y;
+    // centroid_CATS2X = corrected_CATS2X;
+    // centroid_CATS2Y = corrected_CATS2Y;
 
-    X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
-    Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
+    // X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
+    // Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
 
-   // hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
-  // hTargetXY->Fill(X_f, Y_f);
-  // std::cout<<X_f<<endl;
+   hTargetXY->Fill(centroid_CATS1X,centroid_CATS1Y);
+  //hTargetXY->Fill(X_f, Y_f);
+  //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
     
-
 }
 
 TCanvas* canvasTargetXY = new TCanvas("canvasTargetXY", "Target XY", 900, 800);
 hTargetXY->Draw("COLZ");
 canvasTargetXY->Update();
 gPad->WaitPrimitive();
+
+std::cout<<"FINALIZAT";
 
 }

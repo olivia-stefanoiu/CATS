@@ -73,7 +73,7 @@ def RANSAC_fit_line(x, y, threshold, show):
 x_vals = []
 y_vals = []
 
-text_file_handle = open("/home/olivia/Desktop/scripts/CATS/CATS1_centroid.txt", "r")
+text_file_handle = open("/home/olivia/Desktop/scripts/CATS/CATS2_centroid.txt", "r")
 for line in text_file_handle:
     x_value, y_value = line.split()
     x_vals.append(float(x_value))
@@ -89,12 +89,12 @@ y_selected = [pair[1] for pair in selected_pairs]
 x_selected2 = [x for x, y in zip(x_vals, y_vals) if -8.5 <= x <= -5.7]
 x_mean = sum(x_selected2) / len(x_selected2)
 inliers,slope,intercept =RANSAC_fit_line(x_selected,y_selected,0.0001,True)
-slope =0.02250442496464144 
-intercept = 2.7132336197449174
-x_mean =-7.046736916766848
+# slope =0.02250442496464144 
+# intercept = 2.7132336197449174
+# x_mean =-7.046736916766848
 
-# print(slope,intercept)
-# print(x_mean)
+print(slope,intercept)
+print(x_mean)
 
 #CATS2
 # selected_pairs = [(x_value, y_value) for x_value, y_value in zip(x_vals, y_vals) if (-15 <= x_value <= 14) and (-2.5 <= y_value <= 1)]
@@ -109,7 +109,6 @@ x_mean =-7.046736916766848
 # x_mean = -0.8083158756358418
 # print(slope,intercept)
 # print(x_mean)
-
 
 x_center = x_mean
 
