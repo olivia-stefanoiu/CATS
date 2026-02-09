@@ -59,8 +59,8 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         if(stripIndex == 0 || stripIndex > 27) continue;
         if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]+200) continue;
         //TODO Formula completa contine si inercept dar noi l-am luat zero (raw-ped)^2
-        // double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
-       // energyByStripArray[stripIndex] += calibratedEnergy;
+        double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
+        energyByStripArray[stripIndex] += calibratedEnergy;
     }
 }
 // for the reconstruction algorithms we need to get the ordered values of the strip energies and select only the nstrip highest ones
@@ -111,77 +111,66 @@ double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
 
 
 //Weighted avg has the best results for nstrip = 3 respectively 5. Adding more strips does not increase performance 
-double weighted_average(const double strip_energies[28], const std::vector<int>& ordered_strip_energies, int nstrips=3){
-    //verific deja in fct calculate_centroid
-    if((int)ordered_strip_energies.size()<=1) return -1000.0;
-    if((int)ordered_strip_energies.size() < nstrips) nstrips = (int)ordered_strip_energies.size();
+// double weighted_average(const double strip_energies[28], const std::vector<int>& ordered_strip_energies, int nstrips=3){
+//     //verific deja in fct calculate_centroid
+//     if((int)ordered_strip_energies.size()<=1) return -1000.0;
+//     if((int)ordered_strip_energies.size() < nstrips) nstrips = (int)ordered_strip_energies.size();
 
-    double numerator = 0.0;
-    double denominator = 0.0;
+//     double numerator = 0.0;
+//     double denominator = 0.0;
 
-    // std::vector<int> copied_strip_indices = ordered_strip_energies;
-    // std::vector<int> adjacent_indices;
-    // int max_index = ordered_strip_energies[0]
-    // int index = max_index;
-    // std::sort(copied_strip_indices.begin(), copied_strip_indices.end());
-
-    // auto pointer_position= std::find(copied_strip_indices.begin(), copied_strip_indices.end(), max_index);
-    // int position = (iterator == copied_strip_indices.end()) ? -1 : (int)std::distance(copied_strip_indices.begin(), pointer_position);
-    // int aux_position = position;
-    // //TODO este ok sa presupun ca celelalte stripuri care au tras sunt fix langa?
-    // while( aux_position>0 && position-copied_strip_indices[aux_position]==1){ adjacent_indices.push_back(aux_position)}
-
+   
     
-    for(int rank_index = 0; rank_index < nstrips; rank_index++){
-        int strip_index = ordered_strip_energies[rank_index];
-        double energy = strip_energies[strip_index];
-        numerator += (double)strip_index * energy;
-        denominator += energy;
-    }
+//     for(int rank_index = 0; rank_index < nstrips; rank_index++){
+//         int strip_index = ordered_strip_energies[rank_index];
+//         double energy = strip_energies[strip_index];
+//         numerator += (double)strip_index * energy;
+//         denominator += energy;
+//     }
 
-    if(denominator <= 0.0) return -1000.0;
-    return numerator / denominator;
-}
+//     if(denominator <= 0.0) return -1000.0;
+//     return numerator / denominator;
+// }
 
-bool check_neighbours(std::vector<int>& fstrip, const double strip_energies[28]){
-    if((int)fstrip.size() < 3) return false;
+// bool check_neighbours(std::vector<int>& fstrip, const double strip_energies[28]){
+//     if((int)fstrip.size() < 3) return false;
 
-    int center_strip = fstrip[0];
+//     int center_strip = fstrip[0];
 
-    auto is_neighbour = [&](int strip_index){
-        return (std::fabs(strip_index - center_strip) == 1) && (strip_energies[strip_index] > 0.0);
-    };
+//     auto is_neighbour = [&](int strip_index){
+//         return (std::abs(strip_index - center_strip) == 1) && (strip_energies[strip_index] > 0.0);
+//     };
 
-    if(!is_neighbour(fstrip[1])) return false;
-    if(is_neighbour(fstrip[2])) return true;
+//     if(!is_neighbour(fstrip[1])) return false;
+//     if(is_neighbour(fstrip[2])) return true;
 
-    if((int)fstrip.size() > 3 && is_neighbour(fstrip[3])){
-        int tmp = fstrip[2]; fstrip[2] = fstrip[3]; fstrip[3] = tmp;
-        return true;
-    }
+//     if((int)fstrip.size() > 3 && is_neighbour(fstrip[3])){
+//         int tmp = fstrip[2]; fstrip[2] = fstrip[3]; fstrip[3] = tmp;
+//         return true;
+//     }
 
-    if((int)fstrip.size() > 4 && is_neighbour(fstrip[4])){
-        int tmp = fstrip[2]; fstrip[2] = fstrip[4]; fstrip[4] = tmp;
-        return true;
-    }
+//     if((int)fstrip.size() > 4 && is_neighbour(fstrip[4])){
+//         int tmp = fstrip[2]; fstrip[2] = fstrip[4]; fstrip[4] = tmp;
+//         return true;
+//     }
 
-    return false;
-}
+//     return false;
+// }
 
-double calculate_centroid(double strip_energies[28]){
-    std::vector<int> ordered_strip_energies = build_ordered_strip_energies(strip_energies);
-    int multiplicity = (int)ordered_strip_energies.size();
+
+// double calculate_centroid(double strip_energies[28]){
+//     std::vector<int> ordered_strip_energies = build_ordered_strip_energies(strip_energies);
+//     int multiplicity = (int)ordered_strip_energies.size();
   
-    double x = -1000.0;
-   // x = weighted_average(strip_energies,ordered_strip_energies, 3);
-    if (!check_neighbours(ordered_strip_energies,strip_energies))return -1000;
-    x = sechip(strip_energies,ordered_strip_energies);
-    if(x == -1000.0) return -1000.0;
-    //TODO verifica daca de aici e problema cu gridul 
-    return ((x - 13.5) * 2.54);
-}
+//     double x = -1000.0;
+//    // x = weighted_average(strip_energies,ordered_strip_energies, 3);
+//     if (!check_neighbours(ordered_strip_energies,strip_energies))return -1000;
+//     x = sechip(strip_energies,ordered_strip_energies);
+//     if(x == -1000.0) return -1000.0;
+//     //TODO verifica daca de aici e problema cu gridul 
+//     return ((x - 13.5) * 2.54);
+// }
 
-//aligning the CATS
 void rotate_and_shift_centroid(double input_x, double input_y,
                                double x_shift, double slope_shift, double intercept_shift, double center_position,
                                double& output_x, double& output_y)
@@ -195,6 +184,124 @@ void rotate_and_shift_centroid(double input_x, double input_y,
 
     output_x = x_new * cos_angle - y_new * sin_angle;
     output_y = x_new * sin_angle + y_new * cos_angle;
+}
+
+bool check_neighbours(std::vector<int>& fstrip)
+{
+    if((int)fstrip.size() < 3) return false;
+
+    int tmp = 0;
+    int s0 = fstrip[0];
+
+    if(std::abs(s0 - fstrip[1]) == 1 &&
+       std::abs(s0 - fstrip[2]) == 1)
+        return true;
+
+    bool rval = false;
+
+    if((int)fstrip.size() > 3)
+    {
+        if(std::abs(s0 - fstrip[1]) == 1 &&
+           std::abs(s0 - fstrip[3]) == 1)
+        {
+            tmp = fstrip[2];
+            fstrip[2] = fstrip[3];
+            fstrip[3] = tmp;
+            rval = true;
+        }
+    }
+
+    if(!rval && (int)fstrip.size() > 4)
+    {
+        if(std::abs(s0 - fstrip[1]) == 1 &&
+           std::abs(s0 - fstrip[4]) == 1)
+        {
+            tmp = fstrip[2];
+            fstrip[2] = fstrip[4];
+            fstrip[4] = tmp;
+            rval = true;
+        }
+    }
+
+    return rval;
+}
+
+double weighted_average(const double strip_energies[28],
+                        const std::vector<int>& ordered_strip_energies,
+                        int nstrips,
+                        int number_of_detectors = 28,
+                        double invalid_value = -1000.0)
+{
+    if(nstrips <= 0) return invalid_value;
+    if((int)ordered_strip_energies.size() < nstrips) return invalid_value;
+
+    double v0 = 0.0;
+    double v1 = 0.0;
+
+    for(int k = 0; k < nstrips; k++)
+    {
+        int strip_number = ordered_strip_energies[k];
+        if(strip_number < 0 || strip_number >= number_of_detectors) continue;
+
+        double Q = strip_energies[strip_number];
+        double N = (double)strip_number;
+
+        v0 += Q * N;
+        v1 += Q;
+    }
+
+    if(v1 == 0.0) return invalid_value;
+
+    double xwa = v0 / v1;
+
+    if(xwa > 0.0 && xwa < (double)number_of_detectors) return xwa;
+    return invalid_value;
+}
+
+double calculate_centroid(double strip_energies[28],
+                          const std::vector<int>& fstrip_input,
+                          int number_of_detectors = 28,
+                          double invalid_value = -1000.0,
+                          double single_hit_threshold = 500.0,
+                          double ref_position_mm = 0.0)
+{
+    int m = (int)fstrip_input.size();
+    if(m <= 0) return invalid_value;
+
+    double x_temp_strip = invalid_value;
+
+    if(m >= 3)
+    {
+        std::vector<int> fstrip = fstrip_input;
+
+        if(check_neighbours(fstrip))
+        {
+            x_temp_strip = sechip(strip_energies, fstrip);
+        }
+        else
+        {
+            x_temp_strip = invalid_value;
+        }
+    }
+//     else if(m == 2)
+//     {
+//         x_temp_strip = weighted_average(strip_energies, fstrip_input, 2, number_of_detectors, invalid_value);
+//     }
+//     else
+//     {
+//         int strip0 = fstrip_input[0];
+//         if(strip0 >= 0 && strip0 < number_of_detectors)
+//         {
+//             if(strip_energies[strip0] > single_hit_threshold)
+//                 x_temp_strip = (double)strip0;
+//         }
+//     }
+
+    if(!(x_temp_strip > 0.0 && x_temp_strip < (double)number_of_detectors))
+        return invalid_value;
+
+    double centered_strip = x_temp_strip - ((double)number_of_detectors / 2.0 - 0.5);
+    return centered_strip * 2.54 + ref_position_mm;
 }
 
 
@@ -339,43 +446,55 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
    //Beamul se shifteaza la SI
    //if(!(Id_6>0&& Id_6<10 && Id_11>220 && Id_11<230))continue;
 
-    FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip);
-    FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip);
-    // FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
-    // FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
+    // FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip);
+    // FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip);
+    FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
+    FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
 
-    centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip);
-    centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip);
+//     std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
+// std::vector<int> fstrip_CATS1Y = build_ordered_strip_energies(energy_CATS1Y_byStrip);
+std::vector<int> fstrip_CATS2X = build_ordered_strip_energies(energy_CATS2X_byStrip);
+std::vector<int> fstrip_CATS2Y = build_ordered_strip_energies(energy_CATS2Y_byStrip);
+
+
+//     centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip);
+//     centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip);
 //    centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip);
 //    centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip);
 
-    // if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
-     if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 ) continue;
+// centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip, fstrip_CATS1X);
+// centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip, fstrip_CATS1Y);
+centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip, fstrip_CATS2X);
+centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
+
+
+   // if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
+   if(centroid_CATS2X == -1000 || centroid_CATS2Y == -1000 ) continue;
 
     double corrected_CATS1X, corrected_CATS1Y;
     double corrected_CATS2X, corrected_CATS2Y;
 
-    rotate_and_shift_centroid(centroid_CATS1X, centroid_CATS1Y,
-                          x_shift_CATS1, slope_shift_CATS1, intercept_shift_CATS1, center_position_CATS1,
-                          corrected_CATS1X, corrected_CATS1Y);
+    // rotate_and_shift_centroid(centroid_CATS1X, centroid_CATS1Y,
+    //                       x_shift_CATS1, slope_shift_CATS1, intercept_shift_CATS1, center_position_CATS1,
+    //                       corrected_CATS1X, corrected_CATS1Y);
 
-    // rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
-    //                       x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
-    //                       corrected_CATS2X, corrected_CATS2Y);
+    rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
+                          x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
+                          corrected_CATS2X, corrected_CATS2Y);
     
 //    if(centroid_CATS1X>5 && centroid_CATS1X<6 )
 //     hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
 
-    centroid_CATS1X = corrected_CATS1X;
-    centroid_CATS1Y = corrected_CATS1Y;
-    // centroid_CATS2X = corrected_CATS2X;
-    // centroid_CATS2Y = corrected_CATS2Y;
+    // centroid_CATS1X = corrected_CATS1X;
+    // centroid_CATS1Y = corrected_CATS1Y;
+    centroid_CATS2X = corrected_CATS2X;
+    centroid_CATS2Y = corrected_CATS2Y;
 
     // X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
     // Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
 
-   hTargetXY->Fill(centroid_CATS1X,centroid_CATS1Y);
-  //hTargetXY->Fill(X_f, Y_f);
+   hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
+   //hTargetXY->Fill(X_f, Y_f);
   //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
     
 }
