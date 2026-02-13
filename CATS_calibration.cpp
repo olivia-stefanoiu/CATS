@@ -16,7 +16,7 @@
 #include <iostream>
 
 std::string input_file = "/media/olivia/Partition1/CATS/r0193_000a.root";
-std::string output_file_name = "coeficienti_calibrare_Cats2_Y.txt";
+std::string output_file_name = "coeficienti_calibrare_CATS2_Y.txt";
 //std::ofstream output_lin_reg("coeficienti_regresie_Cats2Y.txt"); Nu merge declaratia in afara main
 
 
@@ -86,7 +86,7 @@ void CATS_calibration()
     //I/O 
     TFile *inputRootFile = TFile::Open(input_file.c_str(), "READ");
     if (!inputRootFile || inputRootFile->IsZombie()) { printf("Cannot open file\n"); return; }
-    std::ofstream output_lin_reg("coeficienti_regresie_Cats2Y.txt");
+    std::ofstream output_lin_reg("coeficienti_regresie_CATS2Y.txt");
 
     TTree *catsTree = (TTree*)inputRootFile->Get("AD");
     if (!catsTree) { printf("Cannot find tree AD\n"); return; }

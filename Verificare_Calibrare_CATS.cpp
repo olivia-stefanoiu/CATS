@@ -38,8 +38,8 @@ double intercept_CATS2X[28];
 double intercept_CATS2Y[28];
 double pedestal_CATS2Y[28];
 
-ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats2X.txt");
-ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_Cats2Y.txt");
+ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2X.txt");
+ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
 TFile *inputRootFile = TFile::Open("/media/olivia/Partition1/CATS/r0193_000a.root", "READ");
 TTree *catsTree = (TTree*)inputRootFile->Get("AD");
 
