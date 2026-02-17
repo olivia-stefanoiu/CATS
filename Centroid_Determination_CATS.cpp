@@ -112,96 +112,30 @@ bool check_neighbours(std::vector<int>& fstrip, const double strip_energies[28])
     return false;
 }
 
-double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip, int nstrips){
-    if(nstrips <= 0) return -1000.0;
-    if((int)fstrip.size() < nstrips) return -1000.0;
-
+double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip, int nstrips=5){
+  
     double numerator = 0.0;
     double denominator = 0.0;
+    int nr = 1;
 
-    for(int rank_index = 0; rank_index < nstrips; rank_index++){
-        int strip_index = fstrip[rank_index];
-        double energy = strip_energies[strip_index];
-        numerator += (double)strip_index * energy;
-        denominator += energy;
+    for (int rank_index = 1; rank_index < (int)fstrip.size() && nr<nstrips; rank_index++) {
+    int strip_index = fstrip[rank_index];
+    if ( strip_index >= fstrip[0] - 6 && strip_index <= fstrip[0] + 6) {
+        
+        numerator += (double)strip_index * strip_energies[strip_index];
+        denominator += strip_energies[strip_index];
+        nr++;
+    
     }
+
+    numerator += (double)fstrip[0] * strip_energies[fstrip[0]];
+    denominator += strip_energies[fstrip[0]];;
+    
 
     if(denominator <= 0.0) return -1000.0;
     return numerator / denominator;
 }
 
-double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
-    if((int)fstrip.size() < 3) return -1000.0;
-
-    int s0 = fstrip[0];
-    int S1 = fstrip[1];
-    int s2 = fstrip[2];
-
-    double q0 = strip_energies[s0];
-    double q1 = strip_energies[S1];
-    double q2 = strip_energies[s2];
-
-    if(q0 <= 0.0 || q1 <= 0.0 || q2 <= 0.0) return -1000.0;
-
-    double v0 = std::sqrt(q0 / q2);
-    double v1 = std::sqrt(q0 / q1);
-    double v2 = 0.5 * (v0 + v1);
-    if(v2 < 1.0) return -1000.0;
-
-    double v3 = std::log(v2 + std::sqrt(v2 * v2 - 1.0));
-    if(v3 == 0.0) return -1000.0;
-
-    double v4 = (v0 - v1) / (2.0 * std::sinh(v3));
-    if(std::fabs(v4) >= 1.0) return -1000.0;
-
-    double v5 = 0.5 * std::log((1.0 + v4) / (1.0 - v4));
-
-    double xs = (double)s0 - (double)(s0 - S1) * v5 / v3;
-    if(xs <= 0.0 || xs >= 28.0) return -1000.0;
-
-    return xs;
-}
-
-double fit_gauss_array(const double strip_energies[28]){
-    static TH1D* h1 = new TH1D("hQCats_tmp","hQCats_tmp",29,-0.5,28.5);
-    static TF1* f1 = new TF1("f1_tmp","gaus(0)",0,28);
-
-    h1->Reset();
-
-    int nmax = -1;
-    double qmax = 0.0;
-
-    for(int strip_index = 0; strip_index < 28; strip_index++){
-        double q = strip_energies[strip_index];
-        if(q <= 0.0) continue;
-
-        h1->Fill((double)strip_index, q);
-
-        if(q > qmax){
-            qmax = q;
-            nmax = strip_index;
-        }
-    }
-
-    if(nmax < 0) return -1000.0;
-
-    f1->SetParameter(0,1000);
-    f1->SetParameter(1,14);
-    f1->SetParameter(2,1.0);
-
-    f1->SetParLimits(1,0,28);
-    f1->SetParLimits(2,0,3);
-
-    double fit_min = (double)nmax - 4.0;
-    double fit_max = (double)nmax + 4.0;
-    if(fit_min < 0.0) fit_min = 0.0;
-    if(fit_max > 28.0) fit_max = 28.0;
-
-    h1->Fit(f1,"QNLB","",fit_min,fit_max);
-
-    double xtmp = f1->GetParameter(1);
-    if(xtmp > 0.0 && xtmp < 28.0) return xtmp;
-    return -1000.0;
 }
 
 double calculate_centroid(double strip_energies[28]){
@@ -211,19 +145,9 @@ double calculate_centroid(double strip_energies[28]){
 
     double x = -1000.0;
 
-    if(m >= 3){
-        if(check_neighbours(fstrip, strip_energies)){
-            x = sechip(strip_energies, fstrip);
-        } else {
-            x = fit_gauss_array(strip_energies);
-        }
-    } else if(m == 2){
-        x = weighted_average(strip_energies, fstrip, 2);
-    } else {
-        if(strip_energies[fstrip[0]] > 500.0) x = (double)fstrip[0];
-        else x = -1000.0;
-    }
-
+    
+    x = weighted_average(strip_energies, fstrip);
+  
     if(x == -1000.0) return -1000.0;
     return ((x - 13.5) * 2.54);
 }

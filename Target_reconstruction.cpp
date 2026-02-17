@@ -28,6 +28,8 @@ void citire_calibrare(std::ifstream &file, double slope[28], double intercept[28
     cout<<'\n';
 }
 
+
+
 //Normalizam la un strip la alegere valorile celorlalte
 void NormalizeToFirstStrip(double* slopeArray, double* interceptArray, int arrayLength = 28, int referenceIndex = 1)
 {
@@ -57,12 +59,14 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         int stripIndex = (int)stripNumberArray[hit_index];
 
         if(stripIndex == 0 || stripIndex > 26) continue;
-        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]+200) continue;
+        if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]) continue;
         //TODO Formula completa contine si inercept dar noi l-am luat zero (raw-ped)^2
         double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
         energyByStripArray[stripIndex] += calibratedEnergy;
     }
 }
+
+
 //TODO nu prea conteaza daca dau skip la 0 si 27 ca oricum sunt zero din calibrare 
 // for the reconstruction algorithms we need to get the ordered values of the strip energies and select only the nstrip highest ones
 std::vector<int> build_ordered_strip_energies(const double strip_energies[28]){
@@ -77,43 +81,6 @@ std::vector<int> build_ordered_strip_energies(const double strip_energies[28]){
               });
     return fired;
 }
-
-
-
-double sechip(const double strip_energies[28], const std::vector<int>& fstrip){
-    // Ported 1:1 from CATS::SECHIP using your fstrip (strip indices) and energy_by_strip (calibrated energies).
-    if((int)fstrip.size() < 3) return -1000.0;
-
-    int s0 = fstrip[0];
-    int s1 = fstrip[1];
-    int s2 = fstrip[2];
-
-    double q0 = strip_energies[s0];
-    double q1 = strip_energies[s1];
-    double q2 = strip_energies[s2];
-
-    if(q0 <= 0.0 || q1 <= 0.0 || q2 <= 0.0) return -1000.0;
-
-    double v0 = sqrt(q0 / q2);
-    double v1 = sqrt(q0 / q1);
-    double v2 = 0.5 * (v0 + v1);
-    if(v2 < 1.0) return -1000.0;
-
-    double v3 = log(v2 + sqrt((v2 * v2) - 1.0));
-    if(v3 == 0.0) return -1000.0;
-
-    double v4 = (v0 - v1) / (2.0 * sinh(v3));
-    if(fabs(v4) >= 1.0) return -1000.0;
-
-    double v5 = 0.5 * log((1.0 + v4) / (1.0 - v4));
-
-    double xs = (double)s0
-              - (double)(s0 - s1) * v5 / v3;
-
-    if(xs > 0.0 && xs < 28.0) return xs;
-    return -1000.0;
-}
-
 
 void rotate_and_shift_centroid(double input_x, double input_y,
                                double x_shift, double slope_shift, double intercept_shift, double center_position,
@@ -130,128 +97,47 @@ void rotate_and_shift_centroid(double input_x, double input_y,
     output_y = x_new * sin_angle + y_new * cos_angle;
 }
 
-
-
-bool check_neighbours(std::vector<int>& fstrip)
+double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip)
 {
-    // Ported 1:1 from CATS::CheckNeighbours logic (using strip indices directly).
-    if((int)fstrip.size() < 3) return false;
+    if(fstrip.size() < 1) return -1000.0;
 
-    int s0 = fstrip[0];
+    int max_strip_index = fstrip[0];
+    if(max_strip_index < 1 || max_strip_index > 26) return -1000.0;
 
-    if( abs(s0 - fstrip[1]) == 1
-        &&
-        abs(s0 - fstrip[2]) == 1 )
-        return true;
+    int min_strip_index = max_strip_index - 2;
+    int max_window_index = max_strip_index + 2;
 
-    bool rval = false;
-    int tmp = 0;
+    if(min_strip_index < 1) min_strip_index = 1;
+    if(max_window_index > 26) max_window_index = 26;
 
-    if((int)fstrip.size() > 3)
+    double weighted_sum = 0.0;
+    double energy_sum = 0.0;
+
+    for(int strip_index = min_strip_index; strip_index <= max_window_index; ++strip_index)
     {
+        double energy = strip_energies[strip_index];
+        if(energy <= 0.0) continue;
 
-        if( abs(s0 - fstrip[1]) == 1
-            &&
-            abs(s0 - fstrip[3]) == 1)
-        {
-            tmp = fstrip[2];
-            fstrip[2] = fstrip[3] ;
-            fstrip[3] = tmp;
-            rval = true;
-        }
-    }
-    if((int)fstrip.size() > 4)
-    {
-        if( abs(s0 - fstrip[1]) == 1
-            &&
-            abs(s0 - fstrip[4]) == 1)
-        {
-            tmp = fstrip[2];
-            fstrip[2] = fstrip[4] ;
-            fstrip[4] = tmp;
-            rval = true;
-        }
+        weighted_sum += energy * (double)strip_index;
+        energy_sum += energy;
     }
 
-    return rval ;
+    if(energy_sum <= 0.0) return -1000.0;
+    return weighted_sum / energy_sum;
 }
 
 
-double weighted_average(const double strip_energies[28],
-                        const std::vector<int>& ordered_strip_energies,
-                        int nstrips,
-                        int number_of_detectors = 28,
-                        double invalid_value = -1000.0)
-{
-    // Ported 1:1 from CATS::WeightedAverage using your ordered_strip_energies (strip indices) and strip_energies.
-    double v0 = 0.0;
-    double v1 = 0.0;
+double calculate_centroid(double strip_energies[28], vector<int>fstrip){
+    int m = (int)fstrip.size();
+    if(m < 1) return -1000.0;
 
-    if((int)ordered_strip_energies.size() >= nstrips)
-    {
-        for(int k = 0; k < nstrips; k++)
-        {
-            double Q = strip_energies[ ordered_strip_energies[k] ];
-            double N = (double)ordered_strip_energies[k];
-            v0 += Q * N;
-            v1 += Q;
-        }
+    double x = -1000.0;
 
-        double xwa = v0 / v1;
-
-        if(xwa > 0.0 && xwa < (double)number_of_detectors)
-        {
-            return xwa;
-        }
-    }
-
-    return invalid_value;
+    x = weighted_average(strip_energies, fstrip);
+  
+    if(x == -1000.0) return -1000.0;
+    return ((x - 13.5) * 2.54);
 }
-
-
-double calculate_centroid(double strip_energies[28],
-                          const std::vector<int>& fstrip_input,
-                          int number_of_detectors = 28,
-                          double invalid_value = -1000.0,
-                          double single_hit_threshold = 500.0,
-                          double ref_position_mm = 0.0)
-{
-    // Ported decision logic from CATS::TreatWire, but using your fstrip_input (already ordered by energy).
-    int m = (int)fstrip_input.size();
-    if(m <= 0) return invalid_value;
-
-    double x_temp_strip = invalid_value;
-
-    if(m >= 3)
-    {
-        std::vector<int> fstrip = fstrip_input;
-        if(check_neighbours(fstrip))
-        {
-            x_temp_strip = sechip(strip_energies, fstrip);
-        }
-        else
-        {
-            x_temp_strip = invalid_value;
-        }
-    }
-    else if(m == 2)
-    {
-        x_temp_strip = weighted_average(strip_energies, fstrip_input, 2, number_of_detectors, invalid_value);
-    }
-    else if(m == 1)
-    {
-        int strip0 = fstrip_input[0];
-        if(strip_energies[strip0] > single_hit_threshold) x_temp_strip = (double)strip0;
-        else x_temp_strip = invalid_value;
-    }
-
-    if(!(x_temp_strip > 0.0 && x_temp_strip < (double)number_of_detectors))
-        return invalid_value;
-
-    double centered_strip = x_temp_strip - ((double)number_of_detectors / 2.0 - 0.5);
-    return centered_strip * 2.54 + ref_position_mm;
-}
-
 
 void Target_reconstruction(){
 
@@ -259,7 +145,7 @@ ifstream fisier_coeficienti_CATS1X("/home/olivia/Desktop/scripts/CATS/coeficient
 ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS1Y.txt");
 ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2X.txt");
 ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
-const char* file_address = "/media/olivia/Partition1/CATS/r0990_00*a.root";
+const char* file_address = "/media/olivia/Partition1/CATS/r1159_00*a.root";
 
 //TFile *inputRootFile = TFile::Open("/media/olivia/Partition1/CATS/r1163_000a.root", "READ");
 
@@ -381,18 +267,20 @@ catsTree->SetBranchAddress("Id_11", &Id_11);
 Long64_t entries = catsTree->GetEntries();
 TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40,40, 1000, -40, 40);
 TH1F* hTargetXY2 = new TH1F("h2", "X);X_{f};Y_{f}", 1000, -40,40);
+TH1F* hTargetXY3 = new TH1F("h3", "X);X_{f};Y_{f}", 1000, -40,40);
+TH1F* hTargetXY4 = new TH1F("h4", "X);X_{f};Y_{f}", 1000, -40,40);
+TH1F* hTargetXY5 = new TH1F("h5", "X);X_{f};Y_{f}", 1000, -40,40);
 
-
-for (Long64_t entry = 0; entry < entries/10; ++entry) {
+for (Long64_t entry = 0; entry < entries; ++entry) {
 
     catsTree->GetEntry(entry);
 
-   //if(!(Id_6>6.4 && Id_6<6.7 && Id_11>225.3 && Id_11<225.9))continue; //verificam ca am selectat doar anumiti nuclei 
+  if(!(Id_6>6.4 && Id_6<6.7 && Id_11>225.3 && Id_11<225.9))continue; //verificam ca am selectat doar anumiti nuclei 
    //if(!(Id_6>4 && Id_6<22 && Id_11>220 && Id_11<235))continue;
     //if ( DATATRIG_CATS2TS-DATATRIG_CATS1TS>2000) continue; not needed all events are in the interval
 
     //948 SULF
-   //if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
+  //if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
    //Beamul se shifteaza la SI
   // if(!(Id_6>0&& Id_6<10 && Id_11>220 && Id_11<230))continue;
 
@@ -401,26 +289,18 @@ for (Long64_t entry = 0; entry < entries/10; ++entry) {
     FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
     FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
 
-    std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
+std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
 std::vector<int> fstrip_CATS1Y = build_ordered_strip_energies(energy_CATS1Y_byStrip);
 std::vector<int> fstrip_CATS2X = build_ordered_strip_energies(energy_CATS2X_byStrip);
 std::vector<int> fstrip_CATS2Y = build_ordered_strip_energies(energy_CATS2Y_byStrip);
 
-
-//     centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip);
-//     centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip);
-//    centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip);
-//    centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip);
 
 centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip, fstrip_CATS1X);
 centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip, fstrip_CATS1Y);
 centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip, fstrip_CATS2X);
 centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
 
-
-
-   // if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
-   if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 ) continue;
+    if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
 
     double corrected_CATS1X, corrected_CATS1Y;
     double corrected_CATS2X, corrected_CATS2Y;
@@ -441,26 +321,43 @@ centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
     centroid_CATS2X = corrected_CATS2X;
     centroid_CATS2Y = corrected_CATS2Y;
 
-    double tmp = centroid_CATS2X;
-    centroid_CATS2X = -centroid_CATS2Y;
-    centroid_CATS2Y =  tmp;
-
     X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
     Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
     //Theta si fi 
 
- hTargetXY->Fill(centroid_CATS1X,centroid_CATS1Y);
- hTargetXY2->Fill(centroid_CATS1X);
-  //hTargetXY->Fill(X_f, Y_f);
+ hTargetXY->Fill(X_f,Y_f);
+//  hTargetXY2->Fill(centroid_CATS1X);
+//  hTargetXY3->Fill(centroid_CATS1Y);
+//  hTargetXY4->Fill(centroid_CATS2X);
+//  hTargetXY5->Fill(centroid_CATS2Y);
+  
   //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
     
 }
 
-TCanvas* canvasTargetXY = new TCanvas("canvasTargetXY", "Target XY", 900, 800);
-hTargetXY2->Draw("COLZ");
+TCanvas* canvasTargetXY = new TCanvas("canvasTargetXY", "Target (c2,c2)", 900, 800);
+hTargetXY->Draw("COLZ");
 canvasTargetXY->Update();
-gPad->WaitPrimitive();
 
-std::cout<<"FINALIZAT";
+// TCanvas* canvasC1X = new TCanvas("canvasC1X", "C1X", 900, 800);
+// hTargetXY2->Draw();
+// canvasC1X->Update();
+
+// TCanvas* canvasC1Y = new TCanvas("canvasC1Y", "C1Y", 900, 800);
+// hTargetXY3->Draw();
+// canvasC1Y->Update();
+
+// TCanvas* canvasC2X = new TCanvas("canvasC2X", "C2X", 900, 800);
+// hTargetXY4->Draw();
+// canvasC2X->Update();
+
+// TCanvas* canvasC2Y = new TCanvas("canvasC2Y", "C2Y", 900, 800);
+// hTargetXY5->Draw();
+// canvasC2Y->Update();
+
+gSystem->ProcessEvents();
+std::cin.get();
+
+
 
 }
