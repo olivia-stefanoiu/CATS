@@ -6,6 +6,9 @@
 #include <TDirectory.h>
 #include <TF1.h>
 #include <TGraph.h>
+#include <TChain.h>
+#include <TH1F.h>
+#include <TSystem.h>
 
 #include <vector>
 #include <string>
@@ -15,6 +18,8 @@
 #include <array>
 #include <iostream>
 #include <math.h>
+
+using namespace std;
 
 
 void citire_calibrare(std::ifstream &file, double slope[28], double intercept[28],double pedestal[28])
@@ -61,7 +66,11 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         if(stripIndex == 0 || stripIndex > 26) continue;
         if((double)rawValueArray[hit_index] < pedestalArray[stripIndex]) continue;
         //TODO Formula completa contine si inercept dar noi l-am luat zero (raw-ped)^2
+        //TODO de ce se adauga acel random intre 0.5 si de ce isi iau ei intervalele constante?
         double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
+        double random_value = ((double)rand() / (double)RAND_MAX) - 0.5;
+        calibratedEnergy+=random_value;
+
         energyByStripArray[stripIndex] += calibratedEnergy;
     }
 }
@@ -82,30 +91,26 @@ std::vector<int> build_ordered_strip_energies(const double strip_energies[28]){
     return fired;
 }
 
-void rotate_and_shift_centroid(double input_x, double input_y,
-                               double x_shift, double slope_shift, double intercept_shift, double center_position,
-                               double& output_x, double& output_y)
+void shift_centroid(double input_x, double input_y,
+                    double x_shift, double y_shift,
+                    double& output_x, double& output_y)
 {
-    double rotation_angle = atan(slope_shift);
-    double cos_angle = cos(-rotation_angle);
-    double sin_angle = sin(-rotation_angle);
-
-    double x_new = input_x + x_shift;
-    double y_new = input_y - (slope_shift * center_position + intercept_shift);
-
-    output_x = x_new * cos_angle - y_new * sin_angle;
-    output_y = x_new * sin_angle + y_new * cos_angle;
+    output_x = input_x + x_shift;
+    output_y = input_y + y_shift;
 }
+
+
 
 double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip)
 {
-    if(fstrip.size() < 1) return -1000.0;
+    //TODO scapa de hardcodare ptr n strip
+    if(fstrip.size() < 3) return -1000.0;
 
     int max_strip_index = fstrip[0];
     if(max_strip_index < 1 || max_strip_index > 26) return -1000.0;
 
-    int min_strip_index = max_strip_index - 2;
-    int max_window_index = max_strip_index + 2;
+    int min_strip_index = max_strip_index - 1;
+    int max_window_index = max_strip_index + 1;
 
     if(min_strip_index < 1) min_strip_index = 1;
     if(max_window_index > 26) max_window_index = 26;
@@ -145,9 +150,11 @@ ifstream fisier_coeficienti_CATS1X("/home/olivia/Desktop/scripts/CATS/coeficient
 ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS1Y.txt");
 ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2X.txt");
 ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
-const char* file_address = "/media/olivia/Partition1/CATS/r1159_00*a.root";
 
-//TFile *inputRootFile = TFile::Open("/media/olivia/Partition1/CATS/r1163_000a.root", "READ");
+//const char* file_address = "/media/olivia/Partition1/CATS/r1159_00*a.root";
+TString runTag = "r0990";
+TString fileAddressPattern = Form("/media/olivia/Partition1/CATS/%s_00*a.root", runTag.Data());
+const char* file_address = fileAddressPattern.Data();
 
 double slope_CATS1X[28];
 double slope_CATS1Y[28];
@@ -179,15 +186,15 @@ double centroid_CATS2Y;
 
 //TODO no more hardcoding, read from file
 //TODO recalculeaza ptr Cats1 coeficientii ca e stramb
-double slope_shift_CATS1 = 0.02250442496464144;
-double intercept_shift_CATS1 = 2.7132336197449174;
-double x_shift_CATS1 = 7.046736916766848;
-double center_position_CATS1 = -6.5;
+// double slope_shift_CATS1 = 0.02250442496464144;
+// double intercept_shift_CATS1 = 2.7132336197449174;
+// double x_shift_CATS1 = 7.046736916766848;
+// double center_position_CATS1 = -6.5;
 
-double slope_shift_CATS2 = 0.005910027638249295;
-double intercept_shift_CATS2 = -0.7013276374635101;
-double x_shift_CATS2 = 0.8083158756358418;
-double center_position_CATS2 = -9.5;
+// double slope_shift_CATS2 = 0.005910027638249295;
+// double intercept_shift_CATS2 = -0.7013276374635101;
+// double x_shift_CATS2 = 0.8083158756358418;
+// double center_position_CATS2 = -9.5;
 
 double X_f, Y_f;
 
@@ -223,8 +230,6 @@ ULong64_t DATATRIG_CATS2TS;
 Float_t Id_6;
 Float_t Id_11;
 
-double deltaZ_CATS21 = 632; //lucram in mm
-double deltaZ_targetFromCATS2 = 743;
 
 //TTree *catsTree = (TTree*)inputRootFile->Get("AD");
 TChain* catsTree = new TChain("AD");
@@ -245,7 +250,7 @@ catsTree->SetBranchAddress("CATS2XVN", CATS2XVN);
 
 catsTree->SetBranchAddress("CATS2YVM", &CATS2YVM);
 catsTree->SetBranchAddress("CATS2YV",  &CATS2YV);
-catsTree->SetBranchAddress("CATS2YVN", &CATS2YVN);
+catsTree->SetBranchAddress("CATS2YVN", CATS2YVN);
 
 catsTree->SetBranchAddress("Id_6", &Id_6);
 catsTree->SetBranchAddress("Id_11", &Id_11);
@@ -300,36 +305,57 @@ centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip, fstrip_CATS1Y);
 centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip, fstrip_CATS2X);
 centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
 
-    if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
+if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
 
-    double corrected_CATS1X, corrected_CATS1Y;
-    double corrected_CATS2X, corrected_CATS2Y;
+double corrected_CATS1X, corrected_CATS1Y;
+double corrected_CATS2X, corrected_CATS2Y;
 
-    rotate_and_shift_centroid(centroid_CATS1X, centroid_CATS1Y,
-                          x_shift_CATS1, slope_shift_CATS1, intercept_shift_CATS1, center_position_CATS1,
-                          corrected_CATS1X, corrected_CATS1Y);
+    //scoase din elog si din codul lor
+double rotation_angle_cats1_degrees = -1.2;
+const double Pi = 3.14159265358979323846;
+double x_shift_CATS1 =6.5;
+double y_shift_CATS1 =-1.705;
+double x_shift_CATS2 = 0.188;
+double y_shift_CATS2 =1.509;
 
-    rotate_and_shift_centroid(centroid_CATS2X, centroid_CATS2Y,
-                          x_shift_CATS2, slope_shift_CATS2, intercept_shift_CATS2, center_position_CATS2,
-                          corrected_CATS2X, corrected_CATS2Y);
+//din teza QUentin 6584.8-6037.7
+//TODO pare ciudat ca da negativ dar asa e formula 
+double deltaZ_CATS21 = -547.1; //lucram in mm
+//din fp ref + teza quentin facut diferenta 7600-6584.8
+double deltaZ_targetFromCATS2 = 1015.2;
+double target_angle = 36.7; //tinta nu era dreapta, trebuie corectate distantele
+//din ganil sheet
+
+corrected_CATS1X = centroid_CATS1X * cos(rotation_angle_cats1_degrees * Pi / 180.0)
+                 - centroid_CATS1Y * sin(rotation_angle_cats1_degrees * Pi / 180.0);
+
+X_f = centroid_CATS2X + ( (corrected_CATS1X - centroid_CATS2X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
     
 //    if(centroid_CATS1X>5 && centroid_CATS1X<6 )
-//     hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y);
+//     hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y); //punem conditie pe cats1 si cats2 ca sa vedem ca se
+//aliniaza cat de cat. daca nu au nicio treaba e o problema
 
-    centroid_CATS1X = corrected_CATS1X;
-    centroid_CATS1Y = corrected_CATS1Y;
-    centroid_CATS2X = corrected_CATS2X;
-    centroid_CATS2Y = corrected_CATS2Y;
+corrected_CATS1Y = centroid_CATS1Y * cos(rotation_angle_cats1_degrees * Pi / 180.0)
+                 + centroid_CATS1X * sin(rotation_angle_cats1_degrees * Pi / 180.0);
 
-    X_f = centroid_CATS2X + ( (centroid_CATS2X - centroid_CATS1X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
-    Y_f = centroid_CATS2Y + ( (centroid_CATS2Y - centroid_CATS1Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
-    //Theta si fi 
+//TODO am schimbat formula cu a lor sper ca e ok 
+Y_f = centroid_CATS2Y + ( (corrected_CATS1Y - centroid_CATS2Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
+   
+double Z_f = X_f*tan(target_angle*3.1415926535/180.);//the target correction 
 
- hTargetXY->Fill(X_f,Y_f);
-//  hTargetXY2->Fill(centroid_CATS1X);
-//  hTargetXY3->Fill(centroid_CATS1Y);
-//  hTargetXY4->Fill(centroid_CATS2X);
-//  hTargetXY5->Fill(centroid_CATS2Y);
+double X_f_corr = centroid_CATS2X
+            + ((corrected_CATS1X - centroid_CATS2X) / deltaZ_CATS21)
+            * (deltaZ_targetFromCATS2 + Z_f);
+
+double Y_f_corr = centroid_CATS2Y
+                + ((corrected_CATS1Y - centroid_CATS2Y) / deltaZ_CATS21)
+                * (deltaZ_targetFromCATS2 + Z_f);
+
+ hTargetXY->Fill(X_f_corr,Y_f_corr);
+ hTargetXY2->Fill(centroid_CATS1X);
+ hTargetXY3->Fill(centroid_CATS1Y);
+ hTargetXY4->Fill(centroid_CATS2X);
+ hTargetXY5->Fill(centroid_CATS2Y);
   
   //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
     
@@ -339,23 +365,49 @@ TCanvas* canvasTargetXY = new TCanvas("canvasTargetXY", "Target (c2,c2)", 900, 8
 hTargetXY->Draw("COLZ");
 canvasTargetXY->Update();
 
-// TCanvas* canvasC1X = new TCanvas("canvasC1X", "C1X", 900, 800);
-// hTargetXY2->Draw();
-// canvasC1X->Update();
+TCanvas* canvasC1X = new TCanvas("canvasC1X", "C1X", 900, 800);
+hTargetXY2->Draw();
+canvasC1X->Update();
 
-// TCanvas* canvasC1Y = new TCanvas("canvasC1Y", "C1Y", 900, 800);
-// hTargetXY3->Draw();
-// canvasC1Y->Update();
+TCanvas* canvasC1Y = new TCanvas("canvasC1Y", "C1Y", 900, 800);
+hTargetXY3->Draw();
+canvasC1Y->Update();
 
-// TCanvas* canvasC2X = new TCanvas("canvasC2X", "C2X", 900, 800);
-// hTargetXY4->Draw();
-// canvasC2X->Update();
+TCanvas* canvasC2X = new TCanvas("canvasC2X", "C2X", 900, 800);
+hTargetXY4->Draw();
+canvasC2X->Update();
 
-// TCanvas* canvasC2Y = new TCanvas("canvasC2Y", "C2Y", 900, 800);
-// hTargetXY5->Draw();
-// canvasC2Y->Update();
+TCanvas* canvasC2Y = new TCanvas("canvasC2Y", "C2Y", 900, 800);
+hTargetXY5->Draw();
+canvasC2Y->Update();
 
 gSystem->ProcessEvents();
+
+TFile* outFile = new TFile(Form("TargetReco_%s.root", runTag.Data()), "RECREATE");
+outFile->cd();
+
+hTargetXY->SetName("h_XfYf");
+hTargetXY->SetTitle("XfYf;X_{f} (mm);Y_{f} (mm)");
+hTargetXY->Write();
+
+hTargetXY2->SetName("h_C1X");
+hTargetXY2->SetTitle("C1X;CATS1 X (mm);Counts");
+hTargetXY2->Write();
+
+hTargetXY3->SetName("h_C1Y");
+hTargetXY3->SetTitle("C1Y;CATS1 Y (mm);Counts");
+hTargetXY3->Write();
+
+hTargetXY4->SetName("h_C2X");
+hTargetXY4->SetTitle("C2X;CATS2 X (mm);Counts");
+hTargetXY4->Write();
+
+hTargetXY5->SetName("h_C2Y");
+hTargetXY5->SetTitle("C2Y;CATS2 Y (mm);Counts");
+hTargetXY5->Write();
+
+outFile->Close();
+
 std::cin.get();
 
 
