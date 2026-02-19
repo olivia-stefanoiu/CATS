@@ -1,3 +1,0 @@
-root [2] AD->Draw("CATS1XV","CATS1XVN==1")
-root [3] AD->Draw("CATS1XV","CATS1XVN==15")
-

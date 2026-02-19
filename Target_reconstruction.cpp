@@ -109,8 +109,8 @@ double weighted_average(const double strip_energies[28], const std::vector<int>&
     int max_strip_index = fstrip[0];
     if(max_strip_index < 1 || max_strip_index > 26) return -1000.0;
 
-    int min_strip_index = max_strip_index - 1;
-    int max_window_index = max_strip_index + 1;
+    int min_strip_index = max_strip_index - 2;
+    int max_window_index = max_strip_index + 2;
 
     if(min_strip_index < 1) min_strip_index = 1;
     if(max_window_index > 26) max_window_index = 26;
@@ -152,7 +152,7 @@ ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficient
 ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
 
 //const char* file_address = "/media/olivia/Partition1/CATS/r1159_00*a.root";
-TString runTag = "r0990";
+TString runTag = "r1159";
 TString fileAddressPattern = Form("/media/olivia/Partition1/CATS/%s_00*a.root", runTag.Data());
 const char* file_address = fileAddressPattern.Data();
 
@@ -268,97 +268,113 @@ catsTree->SetBranchAddress("Id_11", &Id_11);
 // std::cout << "Press Enter..." << std::flush;
 // std::cin.get();
 
-
 Long64_t entries = catsTree->GetEntries();
-TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40,40, 1000, -40, 40);
-TH1F* hTargetXY2 = new TH1F("h2", "X);X_{f};Y_{f}", 1000, -40,40);
-TH1F* hTargetXY3 = new TH1F("h3", "X);X_{f};Y_{f}", 1000, -40,40);
-TH1F* hTargetXY4 = new TH1F("h4", "X);X_{f};Y_{f}", 1000, -40,40);
-TH1F* hTargetXY5 = new TH1F("h5", "X);X_{f};Y_{f}", 1000, -40,40);
 
+TH2F* hTargetXY = new TH2F("hTargetXY", "Target (X_f,Y_f);X_{f};Y_{f}", 1000, -40, 40, 1000, -40, 40);
+
+TH2F* hC1_centroid = new TH2F("hC1_centroid", "CATS1 centroid;X (mm);Y (mm)", 1000, -40, 40, 1000, -40, 40);
+TH2F* hC1_shifted  = new TH2F("hC1_shifted",  "CATS1 shifted;X (mm);Y (mm)", 1000, -40, 40, 1000, -40, 40);
+TH2F* hC1_rotated  = new TH2F("hC1_rotated",  "CATS1 rotated;X (mm);Y (mm)", 1000, -40, 40, 1000, -40, 40);
+
+TH2F* hC2_centroid = new TH2F("hC2_centroid", "CATS2 centroid;X (mm);Y (mm)", 1000, -40, 40, 1000, -40, 40);
+TH2F* hC2_shifted  = new TH2F("hC2_shifted",  "CATS2 shifted;X (mm);Y (mm)", 1000, -40, 40, 1000, -40, 40);
+
+TH1F* hTargetXY2 = new TH1F("h2", "CATS1 X centroid;X (mm);Counts", 1000, -40, 40);
+TH1F* hTargetXY3 = new TH1F("h3", "CATS1 Y centroid;Y (mm);Counts", 1000, -40, 40);
+TH1F* hTargetXY4 = new TH1F("h4", "CATS2 X centroid;X (mm);Counts", 1000, -40, 40);
+TH1F* hTargetXY5 = new TH1F("h5", "CATS2 Y centroid;Y (mm);Counts", 1000, -40, 40);
+
+std::cout << entries << '\n';
 for (Long64_t entry = 0; entry < entries; ++entry) {
 
     catsTree->GetEntry(entry);
 
-  if(!(Id_6>6.4 && Id_6<6.7 && Id_11>225.3 && Id_11<225.9))continue; //verificam ca am selectat doar anumiti nuclei 
-   //if(!(Id_6>4 && Id_6<22 && Id_11>220 && Id_11<235))continue;
-    //if ( DATATRIG_CATS2TS-DATATRIG_CATS1TS>2000) continue; not needed all events are in the interval
-
-    //948 SULF
-  //if(!(Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5))continue;
-   //Beamul se shifteaza la SI
-  // if(!(Id_6>0&& Id_6<10 && Id_11>220 && Id_11<230))continue;
+    //990
+   // if(!(Id_6>4.68 && Id_6<5.45 && Id_11>222.2 && Id_11<225))continue; //verificam ca am selectat doar anumiti nuclei 
+    //948
+  //if(!(Id_6>6.55 && Id_6<7.65 && Id_11>226.8 && Id_11<228.96))continue; //verificam ca am selectat doar anumiti nuclei 
+   //1159
+   if(!(Id_6>6.14 && Id_6<7.05 && Id_11>224.49 && Id_11<226.71))continue;
 
     FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip);
     FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip);
     FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
     FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
 
-std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
-std::vector<int> fstrip_CATS1Y = build_ordered_strip_energies(energy_CATS1Y_byStrip);
-std::vector<int> fstrip_CATS2X = build_ordered_strip_energies(energy_CATS2X_byStrip);
-std::vector<int> fstrip_CATS2Y = build_ordered_strip_energies(energy_CATS2Y_byStrip);
+    std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
+    std::vector<int> fstrip_CATS1Y = build_ordered_strip_energies(energy_CATS1Y_byStrip);
+    std::vector<int> fstrip_CATS2X = build_ordered_strip_energies(energy_CATS2X_byStrip);
+    std::vector<int> fstrip_CATS2Y = build_ordered_strip_energies(energy_CATS2Y_byStrip);
 
 
-centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip, fstrip_CATS1X);
-centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip, fstrip_CATS1Y);
-centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip, fstrip_CATS2X);
-centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
-
-if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
-
-double corrected_CATS1X, corrected_CATS1Y;
-double corrected_CATS2X, corrected_CATS2Y;
+    //CENTROID DETERMINATION 
+    double corrected_CATS1X, corrected_CATS1Y;
+   
 
     //scoase din elog si din codul lor
-double rotation_angle_cats1_degrees = -1.2;
-const double Pi = 3.14159265358979323846;
-double x_shift_CATS1 =6.5;
-double y_shift_CATS1 =-1.705;
-double x_shift_CATS2 = 0.188;
-double y_shift_CATS2 =1.509;
+    double rotation_angle_cats1_degrees = -1.2;
+    const double Pi = 3.14159265358979323846;
+    double x_shift_CATS1 =6.5;
+    double y_shift_CATS1 =-1.705;
+    double x_shift_CATS2 = 0.188;
+    double y_shift_CATS2 =1.509;
 
-//din teza QUentin 6584.8-6037.7
-//TODO pare ciudat ca da negativ dar asa e formula 
-double deltaZ_CATS21 = -547.1; //lucram in mm
-//din fp ref + teza quentin facut diferenta 7600-6584.8
-double deltaZ_targetFromCATS2 = 1015.2;
-double target_angle = 36.7; //tinta nu era dreapta, trebuie corectate distantele
-//din ganil sheet
+    //din teza QUentin 6584.8-6037.7
+    //TODO pare ciudat ca da negativ dar asa e formula 
+    double deltaZ_CATS21 = -547.1; //lucram in mm
+    //din fp ref + teza quentin facut diferenta 7600-6584.8
+    double deltaZ_targetFromCATS2 = 1015.2;
+    double target_angle = 36.7; //tinta nu era dreapta, trebuie corectate distantele
+    //din ganil sheet
 
-corrected_CATS1X = centroid_CATS1X * cos(rotation_angle_cats1_degrees * Pi / 180.0)
-                 - centroid_CATS1Y * sin(rotation_angle_cats1_degrees * Pi / 180.0);
 
-X_f = centroid_CATS2X + ( (corrected_CATS1X - centroid_CATS2X) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
-    
-//    if(centroid_CATS1X>5 && centroid_CATS1X<6 )
-//     hTargetXY->Fill(centroid_CATS2X,centroid_CATS2Y); //punem conditie pe cats1 si cats2 ca sa vedem ca se
-//aliniaza cat de cat. daca nu au nicio treaba e o problema
+    centroid_CATS1X = calculate_centroid(energy_CATS1X_byStrip, fstrip_CATS1X);
+    centroid_CATS1Y = calculate_centroid(energy_CATS1Y_byStrip, fstrip_CATS1Y);
+    centroid_CATS2X = calculate_centroid(energy_CATS2X_byStrip, fstrip_CATS2X);
+    centroid_CATS2Y = calculate_centroid(energy_CATS2Y_byStrip, fstrip_CATS2Y);
 
-corrected_CATS1Y = centroid_CATS1Y * cos(rotation_angle_cats1_degrees * Pi / 180.0)
-                 + centroid_CATS1X * sin(rotation_angle_cats1_degrees * Pi / 180.0);
+    if(centroid_CATS1X == -1000 || centroid_CATS1Y == -1000 || centroid_CATS2X == -1000 || centroid_CATS2Y == -1000) continue;
 
-//TODO am schimbat formula cu a lor sper ca e ok 
-Y_f = centroid_CATS2Y + ( (corrected_CATS1Y - centroid_CATS2Y) / deltaZ_CATS21 ) * deltaZ_targetFromCATS2;
-   
-double Z_f = X_f*tan(target_angle*3.1415926535/180.);//the target correction 
+    double shifted_CATS1X,shifted_CATS1Y,shifted_CATS2X,shifted_CATS2Y;
 
-double X_f_corr = centroid_CATS2X
-            + ((corrected_CATS1X - centroid_CATS2X) / deltaZ_CATS21)
-            * (deltaZ_targetFromCATS2 + Z_f);
+    shift_centroid(centroid_CATS1X, centroid_CATS1Y, x_shift_CATS1, y_shift_CATS1, shifted_CATS1X, shifted_CATS1Y);
+    shift_centroid(centroid_CATS2X, centroid_CATS2Y, x_shift_CATS2, y_shift_CATS2, shifted_CATS2X, shifted_CATS2Y);
 
-double Y_f_corr = centroid_CATS2Y
-                + ((corrected_CATS1Y - centroid_CATS2Y) / deltaZ_CATS21)
-                * (deltaZ_targetFromCATS2 + Z_f);
+    corrected_CATS1X = shifted_CATS1X * cos(rotation_angle_cats1_degrees * Pi / 180.0)
+                    - shifted_CATS1Y * sin(rotation_angle_cats1_degrees * Pi / 180.0);
 
- hTargetXY->Fill(X_f_corr,Y_f_corr);
- hTargetXY2->Fill(centroid_CATS1X);
- hTargetXY3->Fill(centroid_CATS1Y);
- hTargetXY4->Fill(centroid_CATS2X);
- hTargetXY5->Fill(centroid_CATS2Y);
-  
-  //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
-    
+    X_f = shifted_CATS2X + ((corrected_CATS1X - shifted_CATS2X) / deltaZ_CATS21) * deltaZ_targetFromCATS2;
+
+    corrected_CATS1Y = shifted_CATS1Y * cos(rotation_angle_cats1_degrees * Pi / 180.0)
+                    + shifted_CATS1X * sin(rotation_angle_cats1_degrees * Pi / 180.0);
+
+    Y_f = shifted_CATS2Y + ((corrected_CATS1Y - shifted_CATS2Y) / deltaZ_CATS21) * deltaZ_targetFromCATS2;
+
+    double Z_f = X_f * tan(target_angle * Pi / 180.0);
+
+    double X_f_corr = shifted_CATS2X
+                    + ((corrected_CATS1X - shifted_CATS2X) / deltaZ_CATS21)
+                    * (deltaZ_targetFromCATS2 + Z_f);
+
+    double Y_f_corr = shifted_CATS2Y
+                    + ((corrected_CATS1Y - shifted_CATS2Y) / deltaZ_CATS21)
+                    * (deltaZ_targetFromCATS2 + Z_f);
+
+    hTargetXY->Fill(X_f_corr, Y_f_corr);
+
+    hC1_centroid->Fill(centroid_CATS1X, centroid_CATS1Y);
+    hC1_shifted->Fill(shifted_CATS1X, shifted_CATS1Y);
+    hC1_rotated->Fill(corrected_CATS1X, corrected_CATS1Y);
+
+    hC2_centroid->Fill(centroid_CATS2X, centroid_CATS2Y);
+    hC2_shifted->Fill(shifted_CATS2X, shifted_CATS2Y);
+
+    hTargetXY2->Fill(centroid_CATS1X);
+    hTargetXY3->Fill(centroid_CATS1Y);
+    hTargetXY4->Fill(centroid_CATS2X);
+    hTargetXY5->Fill(centroid_CATS2Y);
+
+    //std:cout<<centroid_CATS2X<<" "<<centroid_CATS2Y;
 }
 
 TCanvas* canvasTargetXY = new TCanvas("canvasTargetXY", "Target (c2,c2)", 900, 800);
@@ -383,12 +399,18 @@ canvasC2Y->Update();
 
 gSystem->ProcessEvents();
 
-TFile* outFile = new TFile(Form("TargetReco_%s.root", runTag.Data()), "RECREATE");
+TFile* outFile = new TFile(Form("Target_Reconstruction_CATS_%s.root", runTag.Data()), "RECREATE");
 outFile->cd();
 
 hTargetXY->SetName("h_XfYf");
 hTargetXY->SetTitle("XfYf;X_{f} (mm);Y_{f} (mm)");
 hTargetXY->Write();
+
+hC1_centroid->Write();
+hC1_shifted->Write();
+hC1_rotated->Write();
+hC2_centroid->Write();
+hC2_shifted->Write();
 
 hTargetXY2->SetName("h_C1X");
 hTargetXY2->SetTitle("C1X;CATS1 X (mm);Counts");
@@ -409,7 +431,5 @@ hTargetXY5->Write();
 outFile->Close();
 
 std::cin.get();
-
-
 
 }
