@@ -48,6 +48,14 @@ void Histogram_target_recon_display()
     TH1* hC1Y_2 = GetH1(filePointer2, "h_C1Y");
     TH1* hC1Y_3 = GetH1(filePointer3, "h_C1Y");
 
+    TH1* hC2X_1 = GetH1(filePointer1, "h_C2X");
+    TH1* hC2X_2 = GetH1(filePointer2, "h_C2X");
+    TH1* hC2X_3 = GetH1(filePointer3, "h_C2X");
+
+    TH1* hC2Y_1 = GetH1(filePointer1, "h_C2Y");
+    TH1* hC2Y_2 = GetH1(filePointer2, "h_C2Y");
+    TH1* hC2Y_3 = GetH1(filePointer3, "h_C2Y");
+
     TH2* hC1_rotated_1 = GetH2(filePointer1, "hC1_rotated");
     TH2* hC1_rotated_2 = GetH2(filePointer2, "hC1_rotated");
     TH2* hC1_rotated_3 = GetH2(filePointer3, "hC1_rotated");
@@ -83,6 +91,27 @@ void Histogram_target_recon_display()
     legendC1Y->Draw();
 
     canvasC1_1D->Update();
+
+    TCanvas* canvasC2_1D = new TCanvas("canvasC2_1D", "CATS2 centroids (overlay)", 1400, 600);
+    canvasC2_1D->Divide(2, 1);
+
+    canvasC2_1D->cd(1);
+    hC2X_1->SetLineColor(kRed); hC2X_2->SetLineColor(kBlue); hC2X_3->SetLineColor(kGreen+2);
+    hC2X_1->SetLineWidth(2); hC2X_2->SetLineWidth(2); hC2X_3->SetLineWidth(2);
+    hC2X_1->SetTitle("CATS2 X centroid;X (mm);Counts"); hC2X_1->Draw("HIST"); hC2X_2->Draw("HIST SAME"); hC2X_3->Draw("HIST SAME");
+    TLegend* legendC2X = new TLegend(0.65, 0.70, 0.88, 0.88);
+    legendC2X->AddEntry(hC2X_1, label1, "l"); legendC2X->AddEntry(hC2X_2, label2, "l"); legendC2X->AddEntry(hC2X_3, label3, "l");
+    legendC2X->Draw();
+
+    canvasC2_1D->cd(2);
+    hC2Y_1->SetLineColor(kRed); hC2Y_2->SetLineColor(kBlue); hC2Y_3->SetLineColor(kGreen+2);
+    hC2Y_1->SetLineWidth(2); hC2Y_2->SetLineWidth(2); hC2Y_3->SetLineWidth(2);
+    hC2Y_1->SetTitle("CATS2 Y centroid;Y (mm);Counts"); hC2Y_1->Draw("HIST"); hC2Y_2->Draw("HIST SAME"); hC2Y_3->Draw("HIST SAME");
+    TLegend* legendC2Y = new TLegend(0.65, 0.70, 0.88, 0.88);
+    legendC2Y->AddEntry(hC2Y_1, label1, "l"); legendC2Y->AddEntry(hC2Y_2, label2, "l"); legendC2Y->AddEntry(hC2Y_3, label3, "l");
+    legendC2Y->Draw();
+
+    canvasC2_1D->Update();
 
     TCanvas* canvasC1_2D = new TCanvas("canvasC1_2D", "CATS1 2D (rotated) (3 runs)", 1800, 600);
     canvasC1_2D->Divide(3, 1);

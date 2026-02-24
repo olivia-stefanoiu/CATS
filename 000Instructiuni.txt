@@ -1,5 +1,5 @@
 /home/olivia/Desktop/scripts/CATS/CATS2_centroid.txt
-scp -r sise@192.168.146.75:/Data/e798/Softs_Merger/Analysis/RootA/S36/r0945*.root .
+scp -r sise@192.168.146.75:/Data/e798/Softs_Merger/Analysis/RootA/Si34/1/r1010*.root .
 
 chain.Draw("Id_6:Id_11","CATS1XVN==10")
 chain.Draw("CATS1XVN","Id_6>6.4 && Id_6<8 && Id_11>226.5 && Id_11<229.5&&CATS1XV>1000")
