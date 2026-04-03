@@ -56,9 +56,10 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
                          const double* slopeArray,
                          const double* interceptArray,
                          double* energyByStripArray,
-                         TH2F* hRawVsStrip)
+                         TH2F* hRawVsStrip,
+                         TH2F* hRawVsStripCalibrated)
 {//TODO scapa de jegul de hardcodare pentru stripurile care nu merg
-    for(int strip_index = 1; strip_index < 27; ++strip_index) energyByStripArray[strip_index] = 0.0;
+    for(int strip_index = 0; strip_index < 27; ++strip_index) energyByStripArray[strip_index] = 0.0;
 
     for(int hit_index = 0; hit_index < multiplicity; ++hit_index)
     {
@@ -71,6 +72,7 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
         //TODO Formula completa contine si inercept dar noi l-am luat zero (raw-ped)^2
         //TODO de ce se adauga acel random intre 0.5 si de ce isi iau ei intervalele constante?
         double calibratedEnergy = ((double)rawValueArray[hit_index] - pedestalArray[stripIndex]) * slopeArray[stripIndex] + interceptArray[stripIndex];
+        hRawVsStripCalibrated->Fill((double)stripNumberArray[hit_index],calibratedEnergy);
         // double random_value = ((double)rand() / (double)RAND_MAX) - 0.5;
         // calibratedEnergy+=random_value;
 
@@ -83,7 +85,7 @@ void FillEnergiesByStrip(const UShort_t* stripNumberArray,
 std::vector<int> build_ordered_strip_energies(const double strip_energies[28]){
     std::vector<int> fired;
     fired.reserve(28);
-    for(int strip_index = 1; strip_index < 27; strip_index++){
+    for(int strip_index = 0; strip_index < 27; strip_index++){
         if(strip_energies[strip_index] > 0.0) fired.push_back(strip_index);
     }
     std::sort(fired.begin(), fired.end(),
@@ -106,15 +108,15 @@ void shift_centroid(double input_x, double input_y,
 double weighted_average(const double strip_energies[28], const std::vector<int>& fstrip)
 {
     //TODO scapa de hardcodare ptr n strip
-    if(fstrip.size() < 3) return -1000.0;
+    if(fstrip.size() <= 1) return -1000.0;
 
     int max_strip_index = fstrip[0];
-    if(max_strip_index < 1 || max_strip_index > 26) return -1000.0;
+    if(max_strip_index < 0 || max_strip_index > 26) return -1000.0;
 
     int min_strip_index = max_strip_index - 1;
     int max_window_index = max_strip_index + 1;
 
-    if(min_strip_index < 1) min_strip_index = 1;
+    if(min_strip_index < 0) min_strip_index = 0;
     if(max_window_index > 26) max_window_index = 26;
 
     double weighted_sum = 0.0;
@@ -174,7 +176,7 @@ ifstream fisier_coeficienti_CATS1Y("/home/olivia/Desktop/scripts/CATS/coeficient
 ifstream fisier_coeficienti_CATS2X("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2X.txt");
 ifstream fisier_coeficienti_CATS2Y("/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt");
 
-TString runTag = "r1159";
+TString runTag = "r0990";
 TString fileAddressPattern = Form("/media/olivia/Partition1/CATS/Remerged/%s_00*a.root", runTag.Data());
 const char* file_address = fileAddressPattern.Data();
 
@@ -316,11 +318,11 @@ TH2F* hCATS2XV_vs_CATS2XVN = new TH2F("hCATS2XV_vs_CATS2XVN", "CATS2XV vs CATS2X
 TH2F* hCATS2YV_vs_CATS2YVN = new TH2F("hCATS2YV_vs_CATS2YVN", "CATS2YV vs CATS2YVN;CATS2Y strip ", 100, 0, 28, 2000, 0, 10000);
 
 
-TH2F* hCATS1XV_vs_CATS1XVN_calibrated = new TH2F("hCATS1XV_vs_CATS1XVN", "CATS1XV vs CATS1XVN;CATS1X strip calibrated ", 100, 0,28 , 2000, 0, 10000);
-TH2F* hCATS1YV_vs_CATS1YVN_calibrated = new TH2F("hCATS1YV_vs_CATS1YVN", "CATS1YV vs CATS1YVN;CATS1Y strip calibrated ", 100, 0, 28, 2000, 0, 10000);
+TH2F* hCATS1XV_vs_CATS1XVN_calibrated = new TH2F("hCATS1XV_vs_CATS1XVN_calib", "CATS1XV vs CATS1XVN;CATS1X strip calibrated ", 100, 0,28 , 2000, 0, 10000);
+TH2F* hCATS1YV_vs_CATS1YVN_calibrated = new TH2F("hCATS1YV_vs_CATS1YVN_calib", "CATS1YV vs CATS1YVN;CATS1Y strip calibrated ", 100, 0, 28, 2000, 0, 10000);
 
-TH2F* hCATS2XV_vs_CATS2XVN_calibrated = new TH2F("hCATS2XV_vs_CATS2XVN", "CATS2XV vs CATS2XVN;CATS2X strip calibrated", 100, 0, 28, 2000, 0, 10000);
-TH2F* hCATS2YV_vs_CATS2YVN_calibrated = new TH2F("hCATS2YV_vs_CATS2YVN", "CATS2YV vs CATS2YVN;CATS2Y strip calibrated ", 100, 0, 28, 2000, 0, 10000);
+TH2F* hCATS2XV_vs_CATS2XVN_calibrated = new TH2F("hCATS2XV_vs_CATS2XVN_calib", "CATS2XV vs CATS2XVN;CATS2X strip calibrated", 100, 0, 28, 2000, 0, 10000);
+TH2F* hCATS2YV_vs_CATS2YVN_calibrated = new TH2F("hCATS2YV_vs_CATS2YVN_calib", "CATS2YV vs CATS2YVN;CATS2Y strip calibrated ", 100, 0, 28, 2000, 0, 10000);
 
 double xCenter = 0.0;
 double yCenter = 0.0;
@@ -344,10 +346,10 @@ for (Long64_t entry = 0; entry < entries; ++entry) {
     // FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip);
     // FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip);
 
-    FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip, hCATS1XV_vs_CATS1XVN);
-    FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip, hCATS1YV_vs_CATS1YVN);
-    FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip, hCATS2XV_vs_CATS2XVN);
-    FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip, hCATS2YV_vs_CATS2YVN);
+    FillEnergiesByStrip(CATS1XVN, CATS1XV, CATS1XVM, pedestal_CATS1X, slope_CATS1X, intercept_CATS1X, energy_CATS1X_byStrip, hCATS1XV_vs_CATS1XVN, hCATS1XV_vs_CATS1XVN_calibrated);
+    FillEnergiesByStrip(CATS1YVN, CATS1YV, CATS1YVM, pedestal_CATS1Y, slope_CATS1Y, intercept_CATS1Y, energy_CATS1Y_byStrip, hCATS1YV_vs_CATS1YVN, hCATS1YV_vs_CATS1YVN_calibrated);
+    FillEnergiesByStrip(CATS2XVN, CATS2XV, CATS2XVM, pedestal_CATS2X, slope_CATS2X, intercept_CATS2X, energy_CATS2X_byStrip, hCATS2XV_vs_CATS2XVN, hCATS2XV_vs_CATS2XVN_calibrated);
+    FillEnergiesByStrip(CATS2YVN, CATS2YV, CATS2YVM, pedestal_CATS2Y, slope_CATS2Y, intercept_CATS2Y, energy_CATS2Y_byStrip, hCATS2YV_vs_CATS2YVN, hCATS2YV_vs_CATS2YVN_calibrated);
 
     std::vector<int> fstrip_CATS1X = build_ordered_strip_energies(energy_CATS1X_byStrip);
     std::vector<int> fstrip_CATS1Y = build_ordered_strip_energies(energy_CATS1Y_byStrip);
@@ -470,6 +472,22 @@ TCanvas* canvasCATS2Y_raw = new TCanvas("canvasCATS2Y_raw", "CATS2YV vs CATS2YVN
 hCATS2YV_vs_CATS2YVN->Draw("COLZ");
 canvasCATS2Y_raw->Update();
 
+TCanvas* canvasCATS1X_calibrated = new TCanvas("canvasCATS1X_calibrated", "CATS1XV vs CATS1XVN calibrated", 900, 800);
+hCATS1XV_vs_CATS1XVN_calibrated->Draw("COLZ");
+canvasCATS1X_calibrated->Update();
+
+TCanvas* canvasCATS1Y_calibrated = new TCanvas("canvasCATS1Y_calibrated", "CATS1YV vs CATS1YVN calibrated", 900, 800);
+hCATS1YV_vs_CATS1YVN_calibrated->Draw("COLZ");
+canvasCATS1Y_calibrated->Update();
+
+TCanvas* canvasCATS2X_calibrated = new TCanvas("canvasCATS2X_calibrated", "CATS2XV vs CATS2XVN calibrated", 900, 800);
+hCATS2XV_vs_CATS2XVN_calibrated->Draw("COLZ");
+canvasCATS2X_calibrated->Update();
+
+TCanvas* canvasCATS2Y_calibrated = new TCanvas("canvasCATS2Y_calibrated", "CATS2YV vs CATS2YVN calibrated", 900, 800);
+hCATS2YV_vs_CATS2YVN_calibrated->Draw("COLZ");
+canvasCATS2Y_calibrated->Update();
+
 gSystem->ProcessEvents();
 
 TFile* outFile = new TFile(Form("Target_Reconstruction_CATS_%s.root", runTag.Data()), "RECREATE");
@@ -508,6 +526,11 @@ hCATS1XV_vs_CATS1XVN->Write();
 hCATS1YV_vs_CATS1YVN->Write();
 hCATS2XV_vs_CATS2XVN->Write();
 hCATS2YV_vs_CATS2YVN->Write();
+
+hCATS1XV_vs_CATS1XVN_calibrated->Write();
+hCATS1YV_vs_CATS1YVN_calibrated->Write();
+hCATS2XV_vs_CATS2XVN_calibrated->Write();
+hCATS2YV_vs_CATS2YVN_calibrated->Write();
 
 outFile->Close();
 

@@ -1,112 +1,135 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TH1F.h>
-#include <TCanvas.h>
 #include <TSpectrum.h>
 #include <TDirectory.h>
 #include <TF1.h>
 #include <TGraph.h>
+#include <TString.h>
 
 #include <vector>
 #include <string>
 #include <fstream>
 #include <algorithm>
 #include <cstdio>
-#include <array>
 #include <iostream>
-
-std::string input_file = "/media/olivia/Partition1/CATS/r0193_000a.root";
-std::string output_file_name = "coeficienti_calibrare_CATS2_Y.txt";
-//std::ofstream output_lin_reg("coeficienti_regresie_Cats2Y.txt"); Nu merge declaratia in afara main
+#include <TSystem.h>
 
 
-constexpr int number_of_wires = 28;
-constexpr int number_of_peaks = 6;
-double pulser_values[5]={10,25,50,75,100};
-double pedestal[28];
+void Read_Reference_Values(const char *file_name, double reference_values[28])
+{
+    std::ifstream input_stream(file_name);
+    if (!input_stream.is_open()) {
+        std::cout << "Cannot open reference file: " << file_name << '\n';
+        return;
+    }
 
+    int strip_index;
+    double slope_value;
+    double intercept_value;
+    double last_column_value;
 
-//Salvam histogramele si fiturile
-std::vector<TH1F*> stripHistograms;
-std::vector<TCanvas*> stripCanvases;
-std::array<TF1*, number_of_peaks> gaussianFits;
+    while (input_stream >> strip_index >> slope_value >> intercept_value >> last_column_value) {
+        if (strip_index >= 0 && strip_index < 28) {
+            reference_values[strip_index] = last_column_value;
+        }
+    }
 
+    input_stream.close();
+}
 
-//Fiind pointer putem salva direct in el valorile schimbate
-void Gaussian_Fit(Double_t *PeakPositions, TH1F *stripHistogram, int strip_index){
-    for (int peakIndex = 0; peakIndex < 6; ++peakIndex)
+void Gaussian_Fit(Double_t *PeakPositions, TH1F *stripHistogram, int strip_index, int numberOfPeaksFound)
+{
+    for (int peak_index = 0; peak_index < numberOfPeaksFound; ++peak_index)
     {
-        double mean = PeakPositions[peakIndex];
+        double mean_value = PeakPositions[peak_index];
 
         TF1 *fit = new TF1(
-            Form("fit_strip_%d_peak_%d", strip_index, peakIndex),
+            Form("fit_strip_%d_peak_%d", strip_index, peak_index),
             "gaus",
-            mean - 200.0,
-            mean + 200.0
+            mean_value - 200.0,
+            mean_value + 200.0
         );
 
         stripHistogram->Fit(fit, "RQ+");
-        PeakPositions[peakIndex] = fit->GetParameter(1);
+        PeakPositions[peak_index] = fit->GetParameter(1);
     }
 }
+void Linear_Regression(double pulser_values[6], double *PeakPositions, int stripIndex, double reference_values[28])
+{
+    double shifted_Peaks[6];
 
-void Linear_Regression(double *pulser_values, double *PeakPositions, int stripIndex, std::ofstream &output_lin_reg){
+    for (int peak_index = 0; peak_index <= 5; ++peak_index) {
+        shifted_Peaks[peak_index] = PeakPositions[peak_index] - reference_values[stripIndex];
+    }
 
-   double shifted_Peaks[5];
-   for(int i=1;i<=5;i++)shifted_Peaks[i-1]=PeakPositions[i]-PeakPositions[0];
-   TGraph *graph = new TGraph(5, &shifted_Peaks[0], &pulser_values[0]);
+    TCanvas *canvas = new TCanvas(
+        Form("c_lin_strip_%d", stripIndex),
+        Form("Linear regression strip %d", stripIndex),
+        800,
+        600
+    );
 
+    TGraph *graph = new TGraph(6, shifted_Peaks, pulser_values);
+    graph->SetTitle(Form("Strip %d;Shifted peak position;Pulser value", stripIndex));
     graph->SetMarkerStyle(20);
     graph->SetMarkerSize(1.2);
-    graph->SetMarkerColor(kBlue);
-    graph->SetLineColor(kBlue);
 
     TF1 *line = new TF1(
         Form("lin_strip_%d", stripIndex),
         "pol1",
-       shifted_Peaks[0],
-       shifted_Peaks[4]
+        shifted_Peaks[0],
+        shifted_Peaks[5]
     );
 
+    graph->Draw("AP");
     graph->Fit(line, "Q");
-
-    graph->Draw("AP");      // A = axes, P = points
     line->Draw("same");
-
-    // std::cin.get();
+    canvas->Modified();
+    canvas->Update();
+    gSystem->ProcessEvents();
 
     double intercept = line->GetParameter(0);
-    double slope     = line->GetParameter(1);
-    //output_lin_reg<<stripIndex<<" "<<slope<<" "<<intercept<<" "<<PeakPositions[0]<<'\n';
+    double slope = line->GetParameter(1);
 
+    std::cout << stripIndex << " " << slope << " " << intercept << " " << reference_values[stripIndex] << '\n';
+    std::cout << "Press Enter for next strip..." << std::endl;
+    std::cin.get();
 }
-
 void CATS_calibration()
 {
-    //I/O 
-    TFile *inputRootFile = TFile::Open(input_file.c_str(), "READ");
-    if (!inputRootFile || inputRootFile->IsZombie()) { printf("Cannot open file\n"); return; }
-    std::ofstream output_lin_reg("coeficienti_regresie_CATS2Y.txt");
+    const char *input_file = "/media/olivia/Partition1/CATS/r0193_000a.root";
+    const char *reference_file = "/home/olivia/Desktop/scripts/CATS/coeficienti_regresie_CATS2Y.txt";
+
+    double pulser_values[6] = {0,10,25,50,75,100};
+    double reference_values[28] = {0};
+
+    Read_Reference_Values(reference_file, reference_values);
+
+    TFile *inputRootFile = TFile::Open(input_file, "READ");
+    if (!inputRootFile || inputRootFile->IsZombie()) {
+        printf("Cannot open file\n");
+        return;
+    }
 
     TTree *catsTree = (TTree*)inputRootFile->Get("AD");
-    if (!catsTree) { printf("Cannot find tree AD\n"); return; }
-
-    //std::ofstream output_file(output_file_name);
+    if (!catsTree) {
+        printf("Cannot find tree AD\n");
+        inputRootFile->Close();
+        return;
+    }
 
     const int histogramBins = 4000;
     const double histogramMin = 0.0;
-    const double histogramMax = 20000.0; // y este doar pana la 6000 
+    const double histogramMax = 20000.0;
 
     const int maxPeaks = 6;
     const double searchSigma = 2.0;
-    const double searchThreshold = 0.3; //peakurile noastre au dimensiuni similare
-    const double fitHalfWindow = 100.0;
+    const double searchThreshold = 0.3;
 
-    for (int stripIndex = 1; stripIndex < 27; ++stripIndex) // zero este defect
+    for (int stripIndex = 1; stripIndex <= 27; ++stripIndex)
     {
-        //Generam canvasurile si histogramele
-        TCanvas *stripCanvas = new TCanvas(Form("c_CATS2Y_strip_%d", stripIndex), Form("CATS2Y strip %d", stripIndex), 900, 650);
-        stripCanvases.push_back(stripCanvas);
+        gDirectory->Delete(Form("h_CATS2Y_strip_%d;*", stripIndex));
 
         catsTree->Draw(
             Form("CATS2YV>>h_CATS2Y_strip_%d(%d,%f,%f)", stripIndex, histogramBins, histogramMin, histogramMax),
@@ -115,31 +138,32 @@ void CATS_calibration()
         );
 
         TH1F *stripHistogram = (TH1F*)gDirectory->Get(Form("h_CATS2Y_strip_%d", stripIndex));
-        if (!stripHistogram) continue;
-        stripHistograms.push_back(stripHistogram); //salvam histograma pentru export
+        if (!stripHistogram) {
+            std::cout << "Strip " << stripIndex << " histogram not found\n";
+            continue;
+        }
 
-
-        //Gasim peakurile si le aranjam crescator
         TSpectrum *peakFinder = new TSpectrum(maxPeaks);
         Int_t numberOfPeaksFound = peakFinder->Search(stripHistogram, searchSigma, "", searchThreshold);
-       // cout<<numberOfPeaksFound<<endl;
+
+        if (numberOfPeaksFound < 6) {
+            std::cout << "Strip " << stripIndex << " has only " << numberOfPeaksFound << " peaks found\n";
+            delete peakFinder;
+            continue;
+        }
+
         Double_t *PeakPositions = peakFinder->GetPositionX();
-        std::sort(PeakPositions, PeakPositions + numberOfPeaksFound); // nu este nevoie sa le salvam, salvam direct valorile din fit 
+        std::sort(PeakPositions, PeakPositions + numberOfPeaksFound);
 
-      
-        Gaussian_Fit(PeakPositions,stripHistogram,stripIndex);
-       // Linear_Regression(pulser_values,PeakPositions,stripIndex,output_lin_reg);
-       // Verify_Calibration();
+        Gaussian_Fit(PeakPositions, stripHistogram, stripIndex, numberOfPeaksFound);
+        std::sort(PeakPositions, PeakPositions + numberOfPeaksFound);
 
-        // output_file << stripIndex << " ";
-        // for (int i = 0; i < 6; i++){
+        Linear_Regression(pulser_values, PeakPositions, stripIndex, reference_values);
 
-        //     std::cout << PeakPositions[i] << " ";
-        //     output_file << PeakPositions[i] << " ";
-        // }
-        // output_file << "\n";
-       
-     }
-        
-   
+        delete peakFinder;
+    }
+
+    gSystem->ProcessEvents();
+std::cin.get();
+    inputRootFile->Close();
 }

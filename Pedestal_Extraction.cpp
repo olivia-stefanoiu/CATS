@@ -17,7 +17,7 @@ using namespace std;
 int Pedestal_Extraction() {
 
     TChain chain("AD");
-    chain.Add("/media/olivia/Partition1/CATS/r0948_*.root");
+    chain.Add("/media/olivia/Partition1/CATS/r1081_*.root");
 
     TTree* catsTree = &chain;
 
@@ -30,7 +30,7 @@ int Pedestal_Extraction() {
     TCanvas* canvas_by_strip[28];
     TH1F* histogram_by_strip[28];
 
-    TString pdf_name = "CATS2YV_vs_CATS2YVN.pdf";
+    TString pdf_name = "CATS2YV_vs_CATS2YVN_r1081.pdf";
 
     for (int strip_nr = 1; strip_nr <= 27; strip_nr++) {
 
